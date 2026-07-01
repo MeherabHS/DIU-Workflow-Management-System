@@ -105,7 +105,7 @@ class ProjectController extends Controller
                 'title' => $project->title,
                 'description' => $project->description,
                 'department_id' => $project->department_id,
-                'status' => $project->status ?? 'planned',
+                'status' => $this->mapProjectToRepositoryStatus($project->status ?? 'planned'),
                 'created_by' => $request->user()->id,
                 'value_currency' => 'BDT',
             ]);
@@ -449,6 +449,15 @@ class ProjectController extends Controller
     protected function statuses(): array
     {
         return ['planned', 'active', 'submitted', 'completed', 'archive_pending', 'archived', 'cancelled'];
+    }
+
+    protected function mapProjectToRepositoryStatus(string $projectStatus): string
+    {
+        return match ($projectStatus) {
+            'active' => 'ongoing',
+            'archive_pending' => 'completed',
+            default => $projectStatus,
+        };
     }
     protected function storeInitialProjectFile(Request $request, Project $project, mixed $uploadedFile): void
     {
