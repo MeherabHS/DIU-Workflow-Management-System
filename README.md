@@ -306,4 +306,4 @@ AI_MODEL=gpt-4o-mini
 
 ## 📝 License
 
-Proprietary — DIUS Management Portal. All rights reserved.
+Meherab Hossain Shafin. All rights reserved.
