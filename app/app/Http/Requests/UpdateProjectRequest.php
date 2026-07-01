@@ -21,7 +21,7 @@ class UpdateProjectRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
-            'status' => ['required', 'string', Rule::in(['planned', 'active', 'submitted', 'completed', 'archive_pending', 'archived', 'cancelled'])],
+            'status' => ['required', 'string', Rule::in(['planned', 'in_progress', 'submitted', 'completed', 'archived', 'cancelled'])],
             'priority' => ['nullable', 'string', 'max:50'],
             'start_date' => ['nullable', 'date'],
             'deadline' => ['nullable', 'date', 'after_or_equal:start_date'],

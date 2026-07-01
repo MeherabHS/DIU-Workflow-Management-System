@@ -7,7 +7,7 @@ import { Head, Link } from '@inertiajs/react';
 import { BarChart3, FileText, Users, Award, Archive, Activity } from 'lucide-react';
 
 type Kpi = { label: string; value: number; color: string };
-type ProjectStatus = { id: number; title: string; status: string | null; coordinator?: string | null; department?: string | null; deadline?: string | null };
+type ProjectStatus = { id: number; title: string; status: string | null; priority?: string | null; coordinator?: string | null; department?: string | null; deadline?: string | null; is_overdue?: boolean };
 type StatusData = { name: string; value: number; color: string };
 type MonthData = { month: string; completed: number };
 type ModuleItem = { title: string; description: string; href?: string | null; actionLabel?: string | null };
@@ -15,11 +15,21 @@ type ModuleItem = { title: string; description: string; href?: string | null; ac
 const statusColor = (status: string | null): string => {
     switch (status) {
         case 'completed': return 'bg-emerald-100 text-emerald-700';
-        case 'active': return 'bg-blue-100 text-blue-700';
+        case 'in_progress': return 'bg-blue-100 text-blue-700';
         case 'submitted': return 'bg-amber-100 text-amber-700';
         case 'planned': return 'bg-gray-100 text-gray-600';
         case 'archived': return 'bg-gray-100 text-gray-600';
         case 'cancelled': return 'bg-red-100 text-red-700';
+        default: return 'bg-gray-100 text-gray-600';
+    }
+};
+
+const priorityColor = (priority: string | null | undefined): string => {
+    switch (priority) {
+        case 'urgent': return 'bg-red-100 text-red-700';
+        case 'high': return 'bg-orange-100 text-orange-700';
+        case 'medium': return 'bg-yellow-100 text-yellow-700';
+        case 'low': return 'bg-gray-100 text-gray-600';
         default: return 'bg-gray-100 text-gray-600';
     }
 };
@@ -54,7 +64,7 @@ export default function Admin({
             </div>
 
             {/* KPI Cards */}
-            <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                 {kpis.map((kpi) => (
                     <DashboardKpiCard key={kpi.label} label={kpi.label} value={kpi.value} color={kpi.color} />
                 ))}
@@ -66,10 +76,10 @@ export default function Admin({
                 <div className="rounded-xl border border-gray-200 bg-white shadow-sm lg:col-span-3">
                     <div className="border-b border-gray-100 px-5 py-4">
                         <h3 className="text-sm font-semibold text-gray-900">Project Statuses</h3>
-                        <p className="text-xs text-gray-500">Click to view project details</p>
+                        <p className="text-xs text-gray-500">Priority projects — click to view details</p>
                     </div>
                     {!projectStatuses.length ? (
-                        <div className="py-12 text-center text-sm text-gray-400">No projects found.</div>
+                        <div className="py-12 text-center text-sm text-gray-400">No priority projects found.</div>
                     ) : (
                         <div className="divide-y divide-gray-100">
                             {projectStatuses.slice(0, 8).map((p) => (
@@ -83,9 +93,16 @@ export default function Admin({
                                                 {p.deadline && <span>· Due {p.deadline}</span>}
                                             </p>
                                         </div>
-                                        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor(p.status)}`}>
-                                            {humanizeStatus(p.status)}
-                                        </span>
+                                        <div className="flex shrink-0 items-center gap-2">
+                                            {p.priority && (
+                                                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${priorityColor(p.priority)}`}>
+                                                    {p.priority.charAt(0).toUpperCase() + p.priority.slice(1)}
+                                                </span>
+                                            )}
+                                            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor(p.status)}`}>
+                                                {humanizeStatus(p.status)}
+                                            </span>
+                                        </div>
                                     </div>
                                 </Link>
                             ))}

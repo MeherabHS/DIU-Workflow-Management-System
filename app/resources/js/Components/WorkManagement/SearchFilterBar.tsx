@@ -62,7 +62,7 @@ export default function SearchFilterBar({
     const defaultStatusOptions: { value: string; label: string }[] = [
         { value: '', label: 'All Status' },
         { value: 'planned', label: 'Planned' },
-        { value: 'active', label: 'Ongoing' },
+        { value: 'in_progress', label: 'In Progress' },
         { value: 'submitted', label: 'Submitted' },
         { value: 'completed', label: 'Completed' },
         { value: 'archived', label: 'Archived' },

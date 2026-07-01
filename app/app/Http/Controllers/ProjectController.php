@@ -40,7 +40,7 @@ class ProjectController extends Controller
         // Validate search/filter inputs
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
-            'status' => ['nullable', 'in:planned,active,submitted,completed,archive_pending,archived,cancelled'],
+            'status' => ['nullable', 'in:planned,in_progress,submitted,completed,archived,cancelled'],
         ]);
 
         $query = Project::query()
@@ -448,14 +448,13 @@ class ProjectController extends Controller
 
     protected function statuses(): array
     {
-        return ['planned', 'active', 'submitted', 'completed', 'archive_pending', 'archived', 'cancelled'];
+        return ['planned', 'in_progress', 'submitted', 'completed', 'archived', 'cancelled'];
     }
 
     protected function mapProjectToRepositoryStatus(string $projectStatus): string
     {
         return match ($projectStatus) {
-            'active' => 'ongoing',
-            'archive_pending' => 'completed',
+            'in_progress' => 'ongoing',
             default => $projectStatus,
         };
     }

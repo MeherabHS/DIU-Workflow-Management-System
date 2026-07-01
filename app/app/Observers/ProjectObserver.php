@@ -16,8 +16,7 @@ class ProjectObserver
         }
 
         $repositoryStatus = match ($project->status) {
-            'active' => 'ongoing',
-            'archive_pending' => 'completed',
+            'in_progress' => 'ongoing',
             default => $project->status,
         };
 

@@ -134,7 +134,7 @@ class ProjectAssignmentWorkflowTest extends TestCase
 
         $this->actingAs($pm)->post('/projects', [
             'title' => 'PM Project',
-            'status' => 'active',
+            'status' => 'in_progress',
         ])->assertRedirect();
 
         $this->assertDatabaseHas('projects', ['title' => 'PM Project', 'created_by' => $pm->id]);
@@ -157,11 +157,11 @@ class ProjectAssignmentWorkflowTest extends TestCase
 
         $this->actingAs($admin)->patch('/projects/'.$project->id, [
             'title' => 'Updated Project',
-            'status' => 'active',
+            'status' => 'in_progress',
             'description' => 'Updated description',
         ])->assertRedirect(route('projects.show', $project));
 
-        $this->assertDatabaseHas('projects', ['id' => $project->id, 'title' => 'Updated Project', 'status' => 'active']);
+        $this->assertDatabaseHas('projects', ['id' => $project->id, 'title' => 'Updated Project', 'status' => 'in_progress']);
     }
 
     public function test_pm_can_update_project(): void

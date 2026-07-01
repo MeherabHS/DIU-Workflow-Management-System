@@ -27,12 +27,17 @@ class BackfillRepositoryEntries extends Command
                     continue;
                 }
 
+                $repositoryStatus = match ($project->status ?? 'planned') {
+                    'in_progress' => 'ongoing',
+                    default => $project->status ?? 'planned',
+                };
+
                 RepositoryEntry::create([
                     'project_id' => $project->id,
                     'title' => $project->title,
                     'description' => $project->description,
                     'department_id' => $project->department_id,
-                    'status' => $project->status ?? 'planned',
+                    'status' => $repositoryStatus,
                     'created_by' => $project->created_by,
                     'value_currency' => 'BDT',
                 ]);

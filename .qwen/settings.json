@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(docker build *)"
+      "Bash(docker build *)",
+      "Bash(\"g:\\tools\\php\\php.exe\" *)"
     ]
-  }
+  },
+  "$version": 4
 }

@@ -76,7 +76,7 @@ class ProjectFinalizeTest extends TestCase
     public function test_cannot_finalize_incomplete_project(): void
     {
         $admin = $this->makeAdmin();
-        $project = Project::factory()->create(['status' => 'active']);
+        $project = Project::factory()->create(['status' => 'in_progress']);
 
         $this->actingAs($admin)
             ->post(route('projects.finalize-to-repository', $project))
@@ -259,7 +259,7 @@ class ProjectFinalizeTest extends TestCase
     public function test_project_show_does_not_show_finalize_for_non_completed(): void
     {
         $admin = $this->makeAdmin();
-        $project = Project::factory()->create(['status' => 'active']);
+        $project = Project::factory()->create(['status' => 'in_progress']);
 
         $this->actingAs($admin)
             ->get(route('projects.show', $project))

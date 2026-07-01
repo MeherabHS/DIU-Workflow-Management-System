@@ -327,7 +327,7 @@ class WorkflowNotificationTest extends TestCase
         $coordinator = $this->makeCoordinator('coord-deadline@example.com');
         $project = Project::factory()->create([
             'deadline' => now()->addHours(12),
-            'status' => 'active',
+            'status' => 'in_progress',
         ]);
         $this->assignCoordinator($project, $coordinator, $admin);
 
@@ -346,7 +346,7 @@ class WorkflowNotificationTest extends TestCase
         $coordinator = $this->makeCoordinator('coord-overdue@example.com');
         $project = Project::factory()->create([
             'deadline' => now()->subDay(),
-            'status' => 'active',
+            'status' => 'in_progress',
         ]);
         $this->assignCoordinator($project, $coordinator, $admin);
 
@@ -365,7 +365,7 @@ class WorkflowNotificationTest extends TestCase
         $coordinator = $this->makeCoordinator('coord-dup@example.com');
         $project = Project::factory()->create([
             'deadline' => now()->subDay(),
-            'status' => 'active',
+            'status' => 'in_progress',
         ]);
         $this->assignCoordinator($project, $coordinator, $admin);
 

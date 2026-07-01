@@ -81,95 +81,101 @@ class DashboardController extends Controller
     protected function computeDashboardData(?Collection $scopedProjectIds): array
     {
         $now = now()->toDateString();
+        $doneStatuses = ['completed', 'archived', 'cancelled'];
 
-        // In Progress count
-        $inProgress = Subtask::query()
+        // KPI: In Progress — projects with status in_progress or submitted
+        $inProgress = Project::query()
             ->whereIn('status', ['in_progress', 'submitted'])
-            ->when($scopedProjectIds, fn ($q) => $q->whereIn('project_id', $scopedProjectIds))
+            ->when($scopedProjectIds, fn ($q) => $q->whereIn('id', $scopedProjectIds))
             ->count();
 
-        if ($inProgress === 0) {
-            $inProgress = Task::query()
-                ->whereIn('status', ['in_progress', 'submitted'])
-                ->when($scopedProjectIds, fn ($q) => $q->whereIn('project_id', $scopedProjectIds))
-                ->count();
-        }
-
-        // Completed count
-        $completed = Subtask::query()
-            ->whereIn('status', ['completed', 'approved'])
-            ->when($scopedProjectIds, fn ($q) => $q->whereIn('project_id', $scopedProjectIds))
+        // KPI: Completed — projects with status completed
+        $completed = Project::query()
+            ->where('status', 'completed')
+            ->when($scopedProjectIds, fn ($q) => $q->whereIn('id', $scopedProjectIds))
             ->count();
 
-        if ($completed === 0) {
-            $completed = Task::query()
-                ->whereIn('status', ['completed', 'approved'])
-                ->when($scopedProjectIds, fn ($q) => $q->whereIn('project_id', $scopedProjectIds))
-                ->count();
-        }
-
-        // Due count (upcoming deadline, not completed, not overdue)
-        $due = Subtask::query()
+        // KPI: Due — projects not done, deadline is today or future
+        $due = Project::query()
             ->whereNotNull('deadline')
             ->where('deadline', '>=', $now)
-            ->whereNotIn('status', ['completed', 'approved', 'cancelled'])
-            ->when($scopedProjectIds, fn ($q) => $q->whereIn('project_id', $scopedProjectIds))
+            ->whereNotIn('status', $doneStatuses)
+            ->when($scopedProjectIds, fn ($q) => $q->whereIn('id', $scopedProjectIds))
             ->count();
 
-        if ($due === 0) {
-            $due = Task::query()
-                ->whereNotNull('deadline')
-                ->where('deadline', '>=', $now)
-                ->whereNotIn('status', ['completed', 'approved', 'cancelled'])
-                ->when($scopedProjectIds, fn ($q) => $q->whereIn('project_id', $scopedProjectIds))
-                ->count();
-        }
-
-        // Overdue count (past deadline, not completed)
-        $overdue = Subtask::query()
+        // KPI: Overdue — projects not done, deadline is before today
+        $overdue = Project::query()
             ->whereNotNull('deadline')
             ->where('deadline', '<', $now)
-            ->whereNotIn('status', ['completed', 'approved', 'cancelled'])
-            ->when($scopedProjectIds, fn ($q) => $q->whereIn('project_id', $scopedProjectIds))
+            ->whereNotIn('status', $doneStatuses)
+            ->when($scopedProjectIds, fn ($q) => $q->whereIn('id', $scopedProjectIds))
             ->count();
 
-        if ($overdue === 0) {
-            $overdue = Task::query()
-                ->whereNotNull('deadline')
-                ->where('deadline', '<', $now)
-                ->whereNotIn('status', ['completed', 'approved', 'cancelled'])
-                ->when($scopedProjectIds, fn ($q) => $q->whereIn('project_id', $scopedProjectIds))
-                ->count();
-        }
+        // KPI: Total Tasks — real count from tasks table
+        $totalTasks = Task::query()
+            ->when($scopedProjectIds, fn ($q) => $q->whereIn('project_id', $scopedProjectIds))
+            ->count();
 
         $kpis = [
             ['label' => 'In Progress', 'value' => $inProgress, 'color' => 'blue'],
             ['label' => 'Completed', 'value' => $completed, 'color' => 'green'],
             ['label' => 'Due', 'value' => $due, 'color' => 'amber'],
             ['label' => 'Overdue', 'value' => $overdue, 'color' => 'red'],
+            ['label' => 'Total Tasks', 'value' => $totalTasks, 'color' => 'purple'],
         ];
 
-        // Project Statuses for the Project Statuses section
-        $projectQuery = Project::query()->with(['department', 'activePrimaryAssignment.coordinator']);
+        // Project glance: priority-filtered (urgent/high/medium), sorted by overdue → priority → deadline
+        $priorityOrder = ['urgent' => 0, 'high' => 1, 'medium' => 2];
+
+        $projectQuery = Project::query()
+            ->with(['department', 'activePrimaryAssignment.coordinator'])
+            ->whereIn('priority', ['urgent', 'high', 'medium']);
+
         if ($scopedProjectIds !== null) {
             $projectQuery->whereIn('id', $scopedProjectIds);
         }
+
         $projects = $projectQuery->orderBy('deadline')->orderBy('created_at', 'desc')->get();
 
-        $projectStatuses = $projects->map(fn ($p) => [
-            'id' => $p->id,
-            'title' => $p->title,
-            'status' => $p->status,
-            'coordinator' => $p->activePrimaryAssignment?->coordinator?->name,
-            'department' => $p->department?->name,
-            'deadline' => $p->deadline?->format('Y-m-d'),
-        ])->values()->all();
+        $projectStatuses = $projects->map(function ($p) use ($now, $priorityOrder, $doneStatuses) {
+            $isOverdue = $p->deadline && $p->deadline->toDateString() < $now && ! in_array($p->status, $doneStatuses, true);
 
-        // Status donut: completed vs active
-        $totalCount = $inProgress + $completed + $due + $overdue;
+            return [
+                'id' => $p->id,
+                'title' => $p->title,
+                'status' => $p->status,
+                'priority' => $p->priority,
+                'coordinator' => $p->activePrimaryAssignment?->coordinator?->name,
+                'department' => $p->department?->name,
+                'deadline' => $p->deadline?->format('Y-m-d'),
+                'is_overdue' => $isOverdue,
+                'priority_rank' => $priorityOrder[$p->priority] ?? 99,
+            ];
+        });
+
+        // Sort: overdue first, then priority rank (urgent > high > medium), then nearest deadline
+        $projectStatuses = $projectStatuses->sort(function ($a, $b) {
+            // Overdue first
+            if ($a['is_overdue'] !== $b['is_overdue']) {
+                return $b['is_overdue'] <=> $a['is_overdue'];
+            }
+            // Priority rank
+            if ($a['priority_rank'] !== $b['priority_rank']) {
+                return $a['priority_rank'] <=> $b['priority_rank'];
+            }
+            // Nearest deadline
+            return ($a['deadline'] ?? '9999-12-31') <=> ($b['deadline'] ?? '9999-12-31');
+        })->values()->all();
+
+        // Status donut: completed vs active (from project counts)
+        $activeProjects = Project::query()
+            ->whereNotIn('status', $doneStatuses)
+            ->when($scopedProjectIds, fn ($q) => $q->whereIn('id', $scopedProjectIds))
+            ->count();
+
         $statusData = [
             ['name' => 'Completed', 'value' => $completed, 'color' => '#22c55e'],
-            ['name' => 'Active', 'value' => $totalCount - $completed, 'color' => '#f59e0b'],
+            ['name' => 'Active', 'value' => $activeProjects, 'color' => '#f59e0b'],
         ];
 
         // Completion over last 3 months
