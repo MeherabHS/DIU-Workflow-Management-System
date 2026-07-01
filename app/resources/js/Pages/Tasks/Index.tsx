@@ -33,7 +33,6 @@ export default function Index({ project, tasks, canCreateTask = false }: Props) 
                                     fileCount={task.subtasks_count || 0}
                                     actions={[
                                         { label: 'View', href: route('tasks.show', task.id) },
-                                        { label: 'Edit', href: route('tasks.edit', task.id) },
                                     ]}
                                 />
                             );
