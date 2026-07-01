@@ -72,8 +72,10 @@ class SubtaskController extends Controller
 
         $this->audit->logSubtaskCreated($subtask);
 
-        // Clear dashboard cache for users who see this project
-        CacheHelper::forgetDashboardForUsers([$request->user()->id]);
+        // Clear dashboard cache for all role-holding users
+        CacheHelper::forgetDashboardForUsers(
+            User::where('is_active', true)->whereHas('roles')->pluck('id')->all()
+        );
 
         return redirect()->route('subtasks.show', $subtask)->with('status', 'Work item created successfully.');
     }

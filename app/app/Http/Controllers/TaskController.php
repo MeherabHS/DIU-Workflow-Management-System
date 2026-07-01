@@ -10,6 +10,7 @@ use App\Http\Requests\UpdateTaskRequest;
 use App\Models\Project;
 use App\Models\Subtask;
 use App\Models\Task;
+use App\Models\User;
 use App\Models\WorkflowFile;
 use App\Services\AuditLogService;
 use Illuminate\Http\RedirectResponse;
@@ -82,8 +83,10 @@ class TaskController extends Controller
 
         $this->audit->logTaskCreated($task);
 
-        // Clear dashboard cache for users who see this project
-        CacheHelper::forgetDashboardForUsers([$request->user()->id]);
+        // Clear dashboard cache for all role-holding users
+        CacheHelper::forgetDashboardForUsers(
+            User::where('is_active', true)->whereHas('roles')->pluck('id')->all()
+        );
 
         return redirect()->route('tasks.show', $task)->with('status', 'Task created successfully.');
     }
@@ -148,8 +151,10 @@ class TaskController extends Controller
 
         $this->audit->logTaskUpdated($task, ['fields' => $changes]);
 
-        // Clear dashboard cache for users who see this project
-        CacheHelper::forgetDashboardForUsers([$request->user()->id]);
+        // Clear dashboard cache for all role-holding users
+        CacheHelper::forgetDashboardForUsers(
+            User::where('is_active', true)->whereHas('roles')->pluck('id')->all()
+        );
 
         return redirect()->route('tasks.show', $task)->with('status', 'Task updated successfully.');
     }
