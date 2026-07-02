@@ -82,7 +82,7 @@ class TaskSubtaskWorkflowTest extends TestCase
     {
         $subordinate = $this->makeSubordinate();
 
-        $this->actingAs($subordinate)->get('/dashboard')
+        $this->actingAs($subordinate)->get('/subordinate/dashboard')
             ->assertOk()
             ->assertDontSee('Create Task');
     }
@@ -349,11 +349,11 @@ class TaskSubtaskWorkflowTest extends TestCase
         $subordinate = $this->makeSubordinate();
         $coordinator = $this->makeCoordinator();
 
-        $this->actingAs($subordinate)->get('/dashboard')
+        $this->actingAs($subordinate)->get('/subordinate/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('navigation.2.label', 'My Work Items')
-                ->where('navigation.2.href', route('my-work-items.index')));
+                ->where('navigation.0.label', 'My Work Items')
+                ->where('navigation.0.href', route('my-work-items.index')));
         $this->actingAs($subordinate)->get(route('subordinate.dashboard'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -361,11 +361,11 @@ class TaskSubtaskWorkflowTest extends TestCase
                 ->where('modules.0.title', 'My Work Items')
                 ->where('modules.0.href', route('my-work-items.index')));
 
-        $this->actingAs($coordinator)->get('/dashboard')
+        $this->actingAs($coordinator)->get('/coordinator/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('navigation.2.label', 'My Assigned Projects')
-                ->where('navigation.2.href', route('projects.mine')));
+                ->where('navigation.1.label', 'My Assigned Projects')
+                ->where('navigation.1.href', route('projects.mine')));
         $this->actingAs($coordinator)->get(route('coordinator.dashboard'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
@@ -485,16 +485,4 @@ class TaskSubtaskWorkflowTest extends TestCase
         return $user;
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
 

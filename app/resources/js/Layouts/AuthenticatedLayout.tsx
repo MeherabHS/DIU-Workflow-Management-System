@@ -17,7 +17,7 @@ export default function Authenticated({ children }: PropsWithChildren<{ header?:
     return (
         <div className="min-h-screen bg-gray-50 text-gray-950">
             <Header title="DIUS Management Portal" />
-            <main className="py-6">
+            <main className="py-6 md:pl-64">
                 <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
                     {flash?.status && <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">{flash.status}</div>}
                     {children}
@@ -43,3 +43,4 @@ export default function Authenticated({ children }: PropsWithChildren<{ header?:
         </div>
     );
 }
+

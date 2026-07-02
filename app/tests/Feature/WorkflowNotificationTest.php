@@ -47,6 +47,9 @@ class WorkflowNotificationTest extends TestCase
             'user_id' => $coordinator->id,
             'type' => 'coordinator_assigned',
             'project_id' => $project->id,
+            'title' => 'New Project Assigned',
+            'body' => "You have been assigned to project: {$project->title}",
+            'action_url' => '/projects/'.$project->id,
         ]);
     }
 
@@ -86,6 +89,40 @@ class WorkflowNotificationTest extends TestCase
         ]);
     }
 
+    public function test_inline_work_item_creation_notifies_assigned_subordinate(): void
+    {
+        $admin = $this->makeAdmin('admin-inline-subtask@example.com');
+        $coordinator = $this->makeCoordinator('coord-inline-subtask@example.com');
+        $subordinate = $this->makeSubordinate('sub-inline-subtask@example.com');
+        $subtask = Subtask::factory()->forTask()->make([
+            'title' => 'Inline assigned work item',
+            'status' => 'pending',
+            'priority' => 'medium',
+            'deadline' => now()->addWeek()->toDateString(),
+        ]);
+        $task = $subtask->task;
+        $this->assignCoordinator($task->project, $coordinator, $admin);
+
+        $this->actingAs($coordinator)
+            ->post(route('tasks.subtasks.store', $task), [
+                'title' => $subtask->title,
+                'description' => 'Created and assigned inline.',
+                'status' => 'pending',
+                'priority' => 'medium',
+                'deadline' => now()->addWeek()->toDateString(),
+                'subordinate_id' => $subordinate->id,
+            ])
+            ->assertRedirect();
+
+        $created = Subtask::query()->where('title', 'Inline assigned work item')->firstOrFail();
+
+        $this->assertDatabaseHas('workflow_notifications', [
+            'user_id' => $subordinate->id,
+            'type' => 'subordinate_assigned',
+            'subtask_id' => $created->id,
+            'action_url' => '/my-subtasks/'.$created->id,
+        ]);
+    }
     public function test_subordinate_revoke_creates_notification_for_revoked_subordinate(): void
     {
         $coordinator = $this->makeCoordinator('coord-sub-revoke@example.com');
@@ -294,7 +331,7 @@ class WorkflowNotificationTest extends TestCase
         ]);
 
         $this->actingAs($coordinator)
-            ->get(route('dashboard'))
+            ->get(route('coordinator.dashboard'))
             ->assertInertia(fn (Assert $page) => $page
                 ->where('notifications.unreadCount', 2)
             );
@@ -502,8 +539,8 @@ class WorkflowNotificationTest extends TestCase
             'actor_id' => $admin->id,
             'project_id' => $project->id,
             'type' => 'coordinator_assigned',
-            'title' => 'Assigned as Coordinator',
-            'body' => "You have been assigned as coordinator for project: {$project->title}",
+            'title' => 'New Project Assigned',
+            'body' => "You have been assigned to project: {$project->title}",
             'action_url' => $actionUrl,
         ]);
 
@@ -589,3 +626,4 @@ class WorkflowNotificationTest extends TestCase
         return $user;
     }
 }
+

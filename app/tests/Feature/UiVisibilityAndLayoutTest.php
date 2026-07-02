@@ -29,28 +29,28 @@ class UiVisibilityAndLayoutTest extends TestCase
 
     public function test_navigation_data_exposes_full_labels_for_each_role(): void
     {
-        $this->actingAs($this->makeAdmin())->get('/dashboard')
+        $this->actingAs($this->makeAdmin())->get('/admin/dashboard')
             ->assertOk()
             ->assertSee('Admin Dashboard')
             ->assertSee('Projects')
             ->assertSee('Repository Tracker');
 
-        $this->actingAs($this->makePm())->get('/dashboard')
+        $this->actingAs($this->makePm())->get('/pm/dashboard')
             ->assertOk()
             ->assertSee('PM Dashboard')
             ->assertSee('Projects')
             ->assertSee('Repository Tracker');
 
-        $this->actingAs($this->makeCoordinator())->get('/dashboard')
+        $this->actingAs($this->makeCoordinator())->get('/coordinator/dashboard')
             ->assertOk()
             ->assertSee('Coordinator Dashboard')
             ->assertSee('My Assigned Projects')
-            ->assertSee('Repository Tracker');
+            ->assertDontSee('Repository Tracker');
 
-        $this->actingAs($this->makeSubordinate())->get('/dashboard')
+        $this->actingAs($this->makeSubordinate())->get('/subordinate/dashboard')
             ->assertOk()
-            ->assertSee('Subordinate Dashboard')
-            ->assertSee('My Work Items');
+            ->assertSee('My Work Items')
+            ->assertSee('Profile');
     }
 
     public function test_rendered_html_does_not_contain_broken_sidebar_or_hidden_action_patterns(): void

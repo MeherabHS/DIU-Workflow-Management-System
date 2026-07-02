@@ -264,17 +264,17 @@ class RepositoryModuleTest extends TestCase
         $this->assertDatabaseCount('archive_records', 0);
     }
 
-    public function test_repository_navigation_link_appears_only_for_users_with_view_repository_permission(): void
+    public function test_repository_navigation_link_is_limited_to_admin_and_pm_sidebar(): void
     {
         $coordinator = User::factory()->create();
         $coordinator->assignRole('Coordinator');
 
-        $this->actingAs($coordinator)->get('/dashboard')->assertOk()->assertSee('Repository Tracker');
+        $this->actingAs($coordinator)->get('/coordinator/dashboard')->assertOk()->assertDontSee('Repository Tracker');
 
         $subordinate = User::factory()->create();
         $subordinate->assignRole('Subordinate');
 
-        $this->actingAs($subordinate)->get('/dashboard')->assertOk()->assertDontSee('Repository Tracker');
+        $this->actingAs($subordinate)->get('/subordinate/dashboard')->assertOk()->assertDontSee('Repository Tracker');
     }
 
     public function test_repository_index_shows_create_repository_entry_button_only_to_users_with_permission(): void
@@ -330,5 +330,4 @@ class RepositoryModuleTest extends TestCase
         $this->assertDatabaseHas('repository_entries', ['id' => $entry->id, 'title' => 'Original']);
     }
 }
-
 

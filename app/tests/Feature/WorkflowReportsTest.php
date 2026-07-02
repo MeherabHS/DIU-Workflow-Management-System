@@ -135,7 +135,7 @@ class WorkflowReportsTest extends TestCase
     public function test_reports_nav_link_shows_for_admin(): void
     {
         $admin = $this->makeAdmin();
-        $this->actingAs($admin)->get(route('dashboard'))
+        $this->actingAs($admin)->get(route('admin.dashboard'))
             ->assertOk()
             ->assertInertia(fn ($p) => $p->where('navigation', fn ($nav) => collect($nav)->contains(fn ($item) => $item['label'] === 'Reports')));
     }
@@ -143,7 +143,7 @@ class WorkflowReportsTest extends TestCase
     public function test_reports_nav_link_shows_for_pm(): void
     {
         $pm = $this->makePM();
-        $this->actingAs($pm)->get(route('dashboard'))
+        $this->actingAs($pm)->get(route('pm.dashboard'))
             ->assertOk()
             ->assertInertia(fn ($p) => $p->where('navigation', fn ($nav) => collect($nav)->contains(fn ($item) => $item['label'] === 'Reports')));
     }
@@ -151,7 +151,7 @@ class WorkflowReportsTest extends TestCase
     public function test_reports_nav_link_hidden_for_coordinator(): void
     {
         $coord = $this->makeCoordinator();
-        $this->actingAs($coord)->get(route('dashboard'))
+        $this->actingAs($coord)->get(route('coordinator.dashboard'))
             ->assertOk()
             ->assertInertia(fn ($p) => $p->where('navigation', fn ($nav) => !collect($nav)->contains(fn ($item) => $item['label'] === 'Reports')));
     }
@@ -159,8 +159,9 @@ class WorkflowReportsTest extends TestCase
     public function test_reports_nav_link_hidden_for_subordinate(): void
     {
         $sub = $this->makeSubordinate();
-        $this->actingAs($sub)->get(route('dashboard'))
+        $this->actingAs($sub)->get(route('subordinate.dashboard'))
             ->assertOk()
             ->assertInertia(fn ($p) => $p->where('navigation', fn ($nav) => !collect($nav)->contains(fn ($item) => $item['label'] === 'Reports')));
     }
 }
+

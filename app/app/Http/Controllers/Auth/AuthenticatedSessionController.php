@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\DashboardController;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\Subtask;
 use App\Models\Task;
@@ -37,7 +38,7 @@ class AuthenticatedSessionController extends Controller
 
         $this->flashLoginWorkSummary($request);
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        return redirect()->intended(route(DashboardController::homeRouteFor($request->user()), absolute: false));
     }
 
     /**
@@ -165,3 +166,4 @@ class AuthenticatedSessionController extends Controller
         return redirect('/');
     }
 }
+

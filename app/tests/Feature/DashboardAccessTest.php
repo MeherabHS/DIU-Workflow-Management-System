@@ -29,38 +29,32 @@ class DashboardAccessTest extends TestCase
         $this->get('/dashboard')->assertRedirect('/login');
     }
 
-    public function test_authenticated_user_can_access_dashboard(): void
+    public function test_dashboard_redirects_subordinate_to_role_dashboard(): void
     {
         $user = User::factory()->create(['name' => 'General User']);
-        // Give them a basic role so middleware allows access, but test with no role dashboards
-        $user->syncRoles([]);
-
-        // Re-check: user without role should still be blocked by middleware
-        // This test is now superseded by RegistrationTest tests for no-role users
-        // Update: assign Subordinate role so middleware allows access, verify dashboard works
         $user->syncRoles(['Subordinate']);
 
         $this->actingAs($user)
             ->get('/dashboard')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('Dashboard')
-                ->where('auth.user.name', 'General User')
-                ->has('assignedRoles'));
+            ->assertRedirect(route('subordinate.dashboard'));
     }
 
-    public function test_admin_sees_only_allowed_dashboard_links_according_to_permissions(): void
+    public function test_admin_sees_only_allowed_sidebar_links_according_to_permissions(): void
     {
         $user = User::factory()->create();
         $user->syncRoles(['Admin']);
 
         $this->actingAs($user)
-            ->get('/dashboard')
+            ->get('/admin/dashboard')
             ->assertOk()
-            ->assertSee('Admin Dashboard')
-            ->assertSee('PM Dashboard')
-            ->assertSee('Coordinator Dashboard')
-            ->assertSee('Subordinate Dashboard');
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('navigation.0.label', 'Admin Dashboard')
+                ->where('navigation.1.label', 'Users')
+                ->where('navigation.2.label', 'Audit Trail')
+                ->where('navigation.3.label', 'Reports')
+                ->where('navigation.4.label', 'Projects')
+                ->where('navigation.5.label', 'Repository Tracker')
+                ->has('navigation', 6));
     }
 
     public function test_pm_manager_sees_pm_dashboard_link(): void
@@ -69,12 +63,14 @@ class DashboardAccessTest extends TestCase
         $user->syncRoles(['PM/Manager']);
 
         $this->actingAs($user)
-            ->get('/dashboard')
+            ->get('/pm/dashboard')
             ->assertOk()
-            ->assertSee('PM Dashboard')
-            ->assertDontSee('Admin Dashboard')
-            ->assertDontSee('Coordinator Dashboard')
-            ->assertDontSee('Subordinate Dashboard');
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('navigation.0.label', 'PM Dashboard')
+                ->where('navigation.1.label', 'Reports')
+                ->where('navigation.2.label', 'Projects')
+                ->where('navigation.3.label', 'Repository Tracker')
+                ->has('navigation', 4));
     }
 
     public function test_coordinator_sees_coordinator_dashboard_link(): void
@@ -83,12 +79,12 @@ class DashboardAccessTest extends TestCase
         $user->syncRoles(['Coordinator']);
 
         $this->actingAs($user)
-            ->get('/dashboard')
+            ->get('/coordinator/dashboard')
             ->assertOk()
-            ->assertSee('Coordinator Dashboard')
-            ->assertDontSee('Admin Dashboard')
-            ->assertDontSee('PM Dashboard')
-            ->assertDontSee('Subordinate Dashboard');
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('navigation.0.label', 'Coordinator Dashboard')
+                ->where('navigation.1.label', 'My Assigned Projects')
+                ->has('navigation', 2));
     }
 
     public function test_subordinate_sees_subordinate_dashboard_link(): void
@@ -97,12 +93,12 @@ class DashboardAccessTest extends TestCase
         $user->syncRoles(['Subordinate']);
 
         $this->actingAs($user)
-            ->get('/dashboard')
+            ->get('/subordinate/dashboard')
             ->assertOk()
-            ->assertSee('Subordinate Dashboard')
-            ->assertDontSee('Admin Dashboard')
-            ->assertDontSee('PM Dashboard')
-            ->assertDontSee('Coordinator Dashboard');
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('navigation.0.label', 'My Work Items')
+                ->where('navigation.1.label', 'Profile')
+                ->has('navigation', 2));
     }
 
     public function test_pm_manager_cannot_access_admin_dashboard(): void
@@ -205,18 +201,26 @@ class DashboardAccessTest extends TestCase
                 ->where('kpis.4.value', 2));
     }
 
-    public function test_user_without_role_does_not_see_role_dashboard_links(): void
+    public function test_dashboard_redirects_role_aware_for_each_role(): void
     {
-        // Create user and assign Subordinate role (factory default), then test they see subordinate dashboard
-        // No-role users are blocked by middleware - tested in RegistrationTest/SecurityTest
-        $user = User::factory()->create();
+        $admin = User::factory()->create(['email' => 'redirect-admin@example.com']);
+        $admin->syncRoles(['Admin']);
+        $this->actingAs($admin)->get('/dashboard')->assertRedirect(route('admin.dashboard'));
+        auth()->logout();
 
-        $this->actingAs($user)
-            ->get('/dashboard')
-            ->assertOk()
-            ->assertSee('Subordinate Dashboard')
-            ->assertDontSee('Admin Dashboard')
-            ->assertDontSee('PM Dashboard')
-            ->assertDontSee('Coordinator Dashboard');
+        $pm = User::factory()->create(['email' => 'redirect-pm@example.com']);
+        $pm->syncRoles(['PM/Manager']);
+        $this->actingAs($pm)->get('/dashboard')->assertRedirect(route('pm.dashboard'));
+        auth()->logout();
+
+        $coordinator = User::factory()->create(['email' => 'redirect-coordinator@example.com']);
+        $coordinator->syncRoles(['Coordinator']);
+        $this->actingAs($coordinator)->get('/dashboard')->assertRedirect(route('coordinator.dashboard'));
+        auth()->logout();
+
+        $subordinate = User::factory()->create(['email' => 'redirect-subordinate@example.com']);
+        $subordinate->syncRoles(['Subordinate']);
+        $this->actingAs($subordinate)->get('/dashboard')->assertRedirect(route('subordinate.dashboard'));
     }
 }
+

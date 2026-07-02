@@ -12,6 +12,7 @@ use App\Models\SubtaskAssignment;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\AuditLogService;
+use App\Services\WorkflowNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,7 +41,7 @@ class SubtaskController extends Controller
         ]);
     }
 
-    public function store(StoreSubtaskRequest $request, Task $task): RedirectResponse
+    public function store(StoreSubtaskRequest $request, Task $task, WorkflowNotificationService $notificationService): RedirectResponse
     {
         $this->authorize('createForTask', [Subtask::class, $task]);
 
@@ -48,7 +49,7 @@ class SubtaskController extends Controller
         $subordinateId = $validated['subordinate_id'] ?? null;
         unset($validated['subordinate_id']);
 
-        $subtask = DB::transaction(function () use ($request, $task, $validated, $subordinateId) {
+        $subtask = DB::transaction(function () use ($request, $task, $validated, $subordinateId, $notificationService) {
             $subtask = $task->subtasks()->create([
                 ...$validated,
                 'project_id' => $task->project_id,
@@ -65,6 +66,12 @@ class SubtaskController extends Controller
                     'assigned_at' => now(),
                     'revoked_at' => null,
                 ]);
+
+                $notificationService->notifySubordinateAssigned(
+                    $subtask,
+                    User::findOrFail((int) $subordinateId),
+                    $request->user()
+                );
             }
 
             return $subtask;
@@ -162,3 +169,4 @@ class SubtaskController extends Controller
         return ['pending', 'in_progress', 'submitted', 'approved', 'revision_required', 'completed', 'cancelled'];
     }
 }
+

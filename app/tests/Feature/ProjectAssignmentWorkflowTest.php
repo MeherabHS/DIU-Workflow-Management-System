@@ -83,7 +83,7 @@ class ProjectAssignmentWorkflowTest extends TestCase
     {
         $coordinator = $this->makeCoordinator();
 
-        $this->actingAs($coordinator)->get('/dashboard')
+        $this->actingAs($coordinator)->get('/coordinator/dashboard')
             ->assertOk()
             ->assertDontSee('Create Project')
             ->assertSee('My Assigned Projects');
@@ -364,51 +364,51 @@ class ProjectAssignmentWorkflowTest extends TestCase
     public function test_navigation_shows_projects_link_only_to_permitted_admin_and_pm(): void
     {
         $admin = $this->makeAdmin();
-        $this->actingAs($admin)->get('/dashboard')
+        $this->actingAs($admin)->get('/admin/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('navigation.5.label', 'Projects')
-                ->where('navigation.5.href', route('projects.index'))
+                ->where('navigation.4.label', 'Projects')
+                ->where('navigation.4.href', route('projects.index'))
             );
 
         $pm = $this->makePm();
-        $this->actingAs($pm)->get('/dashboard')
+        $this->actingAs($pm)->get('/pm/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('navigation.3.label', 'Projects')
-                ->where('navigation.3.href', route('projects.index'))
+                ->where('navigation.2.label', 'Projects')
+                ->where('navigation.2.href', route('projects.index'))
             );
 
         $subordinate = $this->makeSubordinate();
-        $this->actingAs($subordinate)->get('/dashboard')
+        $this->actingAs($subordinate)->get('/subordinate/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('navigation.2.label', 'My Work Items')
+                ->where('navigation.0.label', 'My Work Items')
             );
     }
 
     public function test_navigation_shows_my_assigned_projects_link_only_to_coordinator(): void
     {
         $coordinator = $this->makeCoordinator();
-        $this->actingAs($coordinator)->get('/dashboard')
+        $this->actingAs($coordinator)->get('/coordinator/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('navigation.2.label', 'My Assigned Projects')
-                ->where('navigation.2.href', route('projects.mine'))
+                ->where('navigation.1.label', 'My Assigned Projects')
+                ->where('navigation.1.href', route('projects.mine'))
             );
 
         $admin = $this->makeAdmin('nav-admin@example.com');
-        $this->actingAs($admin)->get('/dashboard')
+        $this->actingAs($admin)->get('/admin/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('navigation.5.href', route('projects.index'))
+                ->where('navigation.4.href', route('projects.index'))
             );
 
         $pm = $this->makePm('nav-pm@example.com');
-        $this->actingAs($pm)->get('/dashboard')
+        $this->actingAs($pm)->get('/pm/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('navigation.3.href', route('projects.index'))
+                ->where('navigation.2.href', route('projects.index'))
             );
     }
 
@@ -510,9 +510,4 @@ class ProjectAssignmentWorkflowTest extends TestCase
         return $user;
     }
 }
-
-
-
-
-
 

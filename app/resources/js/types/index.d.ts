@@ -21,6 +21,7 @@ export type PageProps<T extends Record<string, unknown> = Record<string, unknown
         status?: string | null;
     };
     loginWorkSummary?: string | null;
+    homeUrl?: string;
     ui?: {
         primaryButtonClass?: string;
     };
@@ -113,3 +114,4 @@ export type RepositoryEntry = {
     finalized_by_name?: string | null;
     final_status_snapshot?: Record<string, unknown> | null;
 };
+

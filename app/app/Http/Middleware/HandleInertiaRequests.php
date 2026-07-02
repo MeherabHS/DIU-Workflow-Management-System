@@ -50,7 +50,8 @@ class HandleInertiaRequests extends Middleware
                 'status' => fn () => $request->session()->get('status'),
             ],
             'loginWorkSummary' => fn () => $request->session()->pull('login_work_summary'),
-            'navigation' => $user ? $this->navigationFor($roles->all()) : [],
+            'homeUrl' => $user ? $this->homeUrlFor($user) : route('login'),
+            'navigation' => $user ? $this->navigationFor($user) : [],
             'ui' => [
                 'primaryButtonClass' => 'bg-gray-900 text-white',
             ],
@@ -60,52 +61,76 @@ class HandleInertiaRequests extends Middleware
         ];
     }
 
-    protected function navigationFor(array $roles): array
+    protected function navigationFor($user): array
     {
+        $roles = method_exists($user, 'getRoleNames') ? $user->getRoleNames()->all() : [];
         $lowerRoles = array_map(fn (string $role): string => strtolower($role), $roles);
         $hasRole = fn (string $role): bool => in_array(strtolower($role), $lowerRoles, true);
+        $can = fn (string $permission): bool => method_exists($user, 'can') && $user->can($permission);
+        $links = [];
+
+        $add = function (bool $allowed, string $label, string $routeName) use (&$links): void {
+            if ($allowed) {
+                $links[] = ['label' => $label, 'href' => route($routeName)];
+            }
+        };
 
         if ($hasRole('Admin')) {
-            return [
-                ['label' => 'Dashboard', 'href' => route('dashboard')],
-                ['label' => 'Admin Dashboard', 'href' => route('admin.dashboard')],
-                ['label' => 'Users', 'href' => route('admin.users.index')],
-                ['label' => 'Audit Trail', 'href' => route('admin.audit-logs.index')],
-                ['label' => 'Reports', 'href' => route('reports.index')],
-                ['label' => 'Projects', 'href' => route('projects.index')],
-                ['label' => 'Repository Tracker', 'href' => route('repository.index')],
-            ];
+            $add($can('access admin dashboard'), 'Admin Dashboard', 'admin.dashboard');
+            $add($can('manage users'), 'Users', 'admin.users.index');
+            $add($can('view audit trail'), 'Audit Trail', 'admin.audit-logs.index');
+            $add($can('view reports'), 'Reports', 'reports.index');
+            $add($can('view projects'), 'Projects', 'projects.index');
+            $add($can('view repository'), 'Repository Tracker', 'repository.index');
+
+            return $links;
         }
 
         if ($hasRole('PM/Manager') || $hasRole('Manager')) {
-            return [
-                ['label' => 'Dashboard', 'href' => route('dashboard')],
-                ['label' => 'PM Dashboard', 'href' => route('pm.dashboard')],
-                ['label' => 'Reports', 'href' => route('reports.index')],
-                ['label' => 'Projects', 'href' => route('projects.index')],
-                ['label' => 'Repository Tracker', 'href' => route('repository.index')],
-            ];
+            $add($can('access pm dashboard'), 'PM Dashboard', 'pm.dashboard');
+            $add($can('view reports'), 'Reports', 'reports.index');
+            $add($can('view projects'), 'Projects', 'projects.index');
+            $add($can('view repository'), 'Repository Tracker', 'repository.index');
+
+            return $links;
         }
 
         if ($hasRole('Coordinator')) {
-            return [
-                ['label' => 'Dashboard', 'href' => route('dashboard')],
-                ['label' => 'Coordinator Dashboard', 'href' => route('coordinator.dashboard')],
-                ['label' => 'My Assigned Projects', 'href' => route('projects.mine')],
-                ['label' => 'Repository Tracker', 'href' => route('repository.index')],
-            ];
+            $add($can('access coordinator dashboard'), 'Coordinator Dashboard', 'coordinator.dashboard');
+            $add($can('view assigned projects'), 'My Assigned Projects', 'projects.mine');
+
+            return $links;
         }
 
         if ($hasRole('Subordinate')) {
-            return [
-                ['label' => 'Dashboard', 'href' => route('dashboard')],
-                ['label' => 'Subordinate Dashboard', 'href' => route('subordinate.dashboard')],
-                ['label' => 'My Work Items', 'href' => route('my-work-items.index')],
-            ];
+            $add($can('view assigned subtasks'), 'My Work Items', 'my-work-items.index');
+            $add($can('view own profile'), 'Profile', 'profile.edit');
+
+            return $links;
         }
 
-        return [
-            ['label' => 'Dashboard', 'href' => route('dashboard')],
-        ];
+        return [];
+    }
+
+    protected function homeUrlFor($user): string
+    {
+        if ($user->hasRole('Admin') && $user->can('access admin dashboard')) {
+            return route('admin.dashboard');
+        }
+
+        if (($user->hasRole('PM/Manager') || $user->hasRole('Manager')) && $user->can('access pm dashboard')) {
+            return route('pm.dashboard');
+        }
+
+        if ($user->hasRole('Coordinator') && $user->can('access coordinator dashboard')) {
+            return route('coordinator.dashboard');
+        }
+
+        if ($user->hasRole('Subordinate') && $user->can('access subordinate dashboard')) {
+            return route('subordinate.dashboard');
+        }
+
+        return route('dashboard');
     }
 }
+

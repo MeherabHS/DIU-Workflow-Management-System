@@ -152,7 +152,7 @@ class RegistrationTest extends TestCase
         $this->post('/login', [
             'email' => 'approved@example.com',
             'password' => 'password',
-        ])->assertRedirect(route('dashboard'));
+        ])->assertRedirect(route('subordinate.dashboard'));
 
         $this->assertAuthenticated();
     }
@@ -173,3 +173,4 @@ class RegistrationTest extends TestCase
         $this->assertTrue($user->getRoleNames()->isEmpty());
     }
 }
+

@@ -30,17 +30,16 @@ class RoleBoundaryVisibilityTest extends TestCase
     {
         $subordinate = $this->makeSubordinate();
 
-        $this->actingAs($subordinate)->get('/dashboard')
+        $this->actingAs($subordinate)->get('/subordinate/dashboard')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('navigation.0.label', 'Dashboard')
-                ->where('navigation.1.label', 'Subordinate Dashboard')
-                ->where('navigation.2.label', 'My Work Items')
-                ->has('navigation', 3)
-                ->where('dashboardModules.0.title', 'My Work Items')
-                ->where('dashboardModules.1.title', 'Update Progress')
-                ->where('dashboardModules.2.title', 'Deadline View')
-                ->has('dashboardModules', 3));
+                ->where('navigation.0.label', 'My Work Items')
+                ->where('navigation.1.label', 'Profile')
+                ->has('navigation', 2)
+                ->where('modules.0.title', 'My Work Items')
+                ->where('modules.1.title', 'Update Progress')
+                ->where('modules.2.title', 'Deadline View')
+                ->has('modules', 3));
     }
 
     public function test_subordinate_is_blocked_from_project_repository_and_coordinator_routes(): void
@@ -302,11 +301,4 @@ class RoleBoundaryVisibilityTest extends TestCase
         return $user;
     }
 }
-
-
-
-
-
-
-
 

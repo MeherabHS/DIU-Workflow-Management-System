@@ -10,13 +10,18 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Illuminate\Http\RedirectResponse;
 use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function index(): Response
+    public function index(): RedirectResponse|Response
     {
         $user = auth()->user();
+
+        if ($redirect = $this->roleHomeRoute($user)) {
+            return redirect()->route($redirect);
+        }
 
         $dashboardLinks = collect($this->dashboardLinks())
             ->filter(fn (array $dashboardLink): bool => $user->can($dashboardLink['permission']))
@@ -33,6 +38,33 @@ class DashboardController extends Controller
         ]);
     }
 
+    public static function homeRouteFor($user): string
+    {
+        if ($user->hasRole('Admin') && $user->can('access admin dashboard')) {
+            return 'admin.dashboard';
+        }
+
+        if (($user->hasRole('PM/Manager') || $user->hasRole('Manager')) && $user->can('access pm dashboard')) {
+            return 'pm.dashboard';
+        }
+
+        if ($user->hasRole('Coordinator') && $user->can('access coordinator dashboard')) {
+            return 'coordinator.dashboard';
+        }
+
+        if ($user->hasRole('Subordinate') && $user->can('access subordinate dashboard')) {
+            return 'subordinate.dashboard';
+        }
+
+        return 'dashboard';
+    }
+
+    protected function roleHomeRoute($user): ?string
+    {
+        $route = self::homeRouteFor($user);
+
+        return $route === 'dashboard' ? null : $route;
+    }
     public function admin(): Response
     {
         app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
@@ -261,7 +293,6 @@ class DashboardController extends Controller
                 ['title' => 'Assigned Projects', 'description' => 'Open only the projects currently assigned to you.', 'href' => route('projects.mine'), 'actionLabel' => 'My Assigned Projects'],
                 ['title' => 'Tasks', 'description' => 'Create and manage tasks from assigned projects.', 'href' => route('projects.mine'), 'actionLabel' => 'View Tasks'],
                 ['title' => 'Assigned Work Items', 'description' => 'Create work items and assign them to Subordinates.', 'href' => route('projects.mine'), 'actionLabel' => 'View Work Items'],
-                ['title' => 'Repository Tracker', 'description' => 'Review repository records linked to your work.', 'href' => auth()->user()->can('view repository') ? route('repository.index') : null, 'actionLabel' => auth()->user()->can('view repository') ? 'Open Repository' : null],
                 ['title' => 'Subordinate Progress', 'description' => 'Review progress on work items under your assigned projects.'],
             ],
             'primaryAction' => ['label' => 'My Assigned Projects', 'href' => route('projects.mine')],
@@ -290,3 +321,4 @@ class DashboardController extends Controller
         ]);
     }
 }
+

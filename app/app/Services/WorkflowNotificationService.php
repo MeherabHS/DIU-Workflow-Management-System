@@ -60,8 +60,8 @@ class WorkflowNotificationService
             'actor_id' => $actor->id,
             'project_id' => $project->id,
             'type' => 'coordinator_assigned',
-            'title' => 'Assigned as Coordinator',
-            'body' => "You have been assigned as coordinator for project: {$project->title}",
+            'title' => 'New Project Assigned',
+            'body' => "You have been assigned to project: {$project->title}",
             'action_url' => $this->relativeRoute('projects.show', $project),
         ]);
     }
@@ -284,3 +284,4 @@ class WorkflowNotificationService
         return $recipients->unique('id');
     }
 }
+
