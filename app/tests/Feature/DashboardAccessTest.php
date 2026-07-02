@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Project;
+use App\Models\Task;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -152,6 +154,32 @@ class DashboardAccessTest extends TestCase
         $subordinate = User::factory()->create();
         $subordinate->syncRoles(['Subordinate']);
         $this->actingAs($subordinate)->get('/subordinate/dashboard')->assertOk()->assertSee('My Work Items')->assertSee('Update Progress');
+    }
+
+    public function test_admin_dashboard_status_overview_and_total_tasks_payload_use_current_data(): void
+    {
+        $admin = User::factory()->create();
+        $admin->syncRoles(['Admin']);
+
+        Project::factory()->create(['status' => 'completed']);
+        $inProgress = Project::factory()->create(['status' => 'in_progress']);
+        Project::factory()->create(['status' => 'submitted']);
+        Project::factory()->create(['status' => 'active']);
+        Project::factory()->create(['status' => 'planned']);
+        Task::factory()->count(3)->for($inProgress)->create();
+
+        $this->actingAs($admin)
+            ->get('/admin/dashboard')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Dashboards/Admin')
+                ->where('statusData.0.name', 'Completed')
+                ->where('statusData.0.value', 1)
+                ->where('statusData.1.name', 'In Progress')
+                ->where('statusData.1.value', 3)
+                ->where('kpis.4.label', 'Total Tasks')
+                ->where('kpis.4.value', Task::count())
+                ->where('statusData', fn ($statusData) => ! collect($statusData)->contains('name', 'Active')));
     }
 
     public function test_user_without_role_does_not_see_role_dashboard_links(): void

@@ -124,8 +124,8 @@ export default function Admin({
                                 <p className="text-xs text-emerald-600">Completed</p>
                             </div>
                             <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-center">
-                                <p className="text-lg font-bold text-gray-700">{statusData.find(d => d.name === 'Active')?.value ?? 0}</p>
-                                <p className="text-xs text-gray-500">Active</p>
+                                <p className="text-lg font-bold text-gray-700">{statusData.find(d => d.name === 'In Progress')?.value ?? 0}</p>
+                                <p className="text-xs text-gray-500">In Progress</p>
                             </div>
                         </div>
                     </div>

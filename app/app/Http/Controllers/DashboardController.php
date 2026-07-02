@@ -167,15 +167,15 @@ class DashboardController extends Controller
             return ($a['deadline'] ?? '9999-12-31') <=> ($b['deadline'] ?? '9999-12-31');
         })->values()->all();
 
-        // Status donut: completed vs active (from project counts)
-        $activeProjects = Project::query()
-            ->whereNotIn('status', $doneStatuses)
+        // Status donut: completed vs in-progress project counts
+        $inProgressProjects = Project::query()
+            ->whereIn('status', ['in_progress', 'submitted', 'active'])
             ->when($scopedProjectIds, fn ($q) => $q->whereIn('id', $scopedProjectIds))
             ->count();
 
         $statusData = [
             ['name' => 'Completed', 'value' => $completed, 'color' => '#22c55e'],
-            ['name' => 'Active', 'value' => $activeProjects, 'color' => '#f59e0b'],
+            ['name' => 'In Progress', 'value' => $inProgressProjects, 'color' => '#f59e0b'],
         ];
 
         // Completion over last 3 months
