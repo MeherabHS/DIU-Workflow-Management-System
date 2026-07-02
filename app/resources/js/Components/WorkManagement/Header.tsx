@@ -26,10 +26,7 @@ export default function Header({ title = 'DIUS Management Portal', roleLabel, ch
                         <Link href={resolvedHomeUrl} className="inline-flex items-center rounded-full bg-white/95 px-3 py-2 shadow-sm ring-1 ring-white/20 transition-colors hover:bg-white">
                             <img src="/images/logo_white.png" alt="DIU Logo" className="w-auto object-contain" style={{ height: '44px' }} />
                         </Link>
-                        <div className="min-w-0">
-                            <div className="truncate text-sm font-bold text-white">{title}</div>
-                            <div className="mt-1 inline-flex rounded-full bg-[#1e3a5f] px-2.5 py-0.5 text-xs font-medium text-gray-300">{role}</div>
-                        </div>
+                        <div className="inline-flex rounded-full bg-[#1e3a5f] px-2.5 py-0.5 text-xs font-medium text-gray-300">{role}</div>
                     </div>
 
                     {user && navigation.length > 0 && (
@@ -86,4 +83,5 @@ export default function Header({ title = 'DIUS Management Portal', roleLabel, ch
         </>
     );
 }
+
 
