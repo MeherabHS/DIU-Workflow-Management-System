@@ -1,6 +1,6 @@
 import { useForm, usePage } from '@inertiajs/react';
 import { PageProps } from '@/types';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import InputError from '@/Components/InputError';
 import PrimaryButton from '@/Components/PrimaryButton';
 import { Camera, Trash2 } from 'lucide-react';
@@ -10,16 +10,25 @@ export default function UpdateProfilePhotoForm({ className = '' }: { className?:
     const user = auth.user!;
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState<string | null>(user.profile_photo_url || null);
+    const [previewFailed, setPreviewFailed] = useState(false);
+
+    useEffect(() => {
+        setPreview(user.profile_photo_url || null);
+        setPreviewFailed(false);
+    }, [user.profile_photo_url]);
 
     const { data, setData, post, delete: destroy, processing, errors, reset } = useForm({
         photo: null as File | null,
     });
+
+    const fallbackInitials = user.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) ?? '?';
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0] || null;
         if (file) {
             setData('photo', file);
             setPreview(URL.createObjectURL(file));
+            setPreviewFailed(false);
         }
     };
 
@@ -42,6 +51,7 @@ export default function UpdateProfilePhotoForm({ className = '' }: { className?:
             preserveScroll: true,
             onSuccess: () => {
                 setPreview(null);
+                setPreviewFailed(false);
             },
         });
     };
@@ -55,11 +65,11 @@ export default function UpdateProfilePhotoForm({ className = '' }: { className?:
 
             <div className="mt-6 flex items-center gap-6">
                 <div className="relative">
-                    {preview ? (
-                        <img src={preview} alt={user.name ?? 'User'} className="h-20 w-20 rounded-full object-cover ring-2 ring-gray-200" />
+                    {preview && !previewFailed ? (
+                        <img src={preview} alt={user.name ?? 'User'} onError={() => setPreviewFailed(true)} className="h-20 w-20 rounded-full object-cover ring-2 ring-gray-200" />
                     ) : (
                         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gray-900 text-xl font-bold text-white">
-                            {user.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) ?? '?'}
+                            {fallbackInitials}
                         </div>
                     )}
                 </div>

@@ -1,7 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import { cva } from 'class-variance-authority';
 import { ArrowRight, Bell, Search } from 'lucide-react';
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { cn, humanize, initials } from '@/lib/utils';
 import { PageProps } from '@/types';
 
@@ -124,9 +124,16 @@ export function ActionLink({ href, children, primary = false }: { href: string; 
 }
 
 export function UserAvatar({ name, photoUrl }: { name?: string | null; photoUrl?: string | null }) {
-    if (photoUrl) {
-        return <img src={photoUrl} alt={name ?? 'User'} className="h-8 w-8 rounded-full object-cover" />;
+    const [imageFailed, setImageFailed] = useState(false);
+
+    useEffect(() => {
+        setImageFailed(false);
+    }, [photoUrl]);
+
+    if (photoUrl && !imageFailed) {
+        return <img src={photoUrl} alt={name ?? 'User'} onError={() => setImageFailed(true)} className="h-8 w-8 rounded-full object-cover" />;
     }
+
     return <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gray-900 text-xs font-bold text-white">{initials(name)}</span>;
 }
 
@@ -159,3 +166,4 @@ export function ModuleCard({ title, description, href, actionLabel }: { title: s
         </Card>
     );
 }
+

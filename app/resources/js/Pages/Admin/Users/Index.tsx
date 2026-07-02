@@ -1,6 +1,7 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
 import { useCallback, useState, useEffect } from 'react';
+import { UserAvatar } from '@/Components/Dius/ui';
 import { Department, Paginator, User as UserType } from '@/types';
 
 type User = UserType & {
@@ -121,13 +122,7 @@ export default function Index({
                                 <tr key={user.id} className={!user.is_active ? 'bg-gray-50' : ''}>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-3">
-                                            {user.profile_photo_url ? (
-                                                <img src={user.profile_photo_url} alt={user.name} className="h-8 w-8 rounded-full object-cover" />
-                                            ) : (
-                                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-900 text-xs font-bold text-white">
-                                                    {user.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) ?? '?'}
-                                                </div>
-                                            )}
+                                            <UserAvatar name={user.name} photoUrl={user.profile_photo_url} />
                                             <span className="text-sm font-medium text-gray-900">{user.name}</span>
                                         </div>
                                     </td>
@@ -189,3 +184,4 @@ export default function Index({
         </AuthenticatedLayout>
     );
 }
+

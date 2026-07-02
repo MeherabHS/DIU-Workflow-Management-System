@@ -12,7 +12,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['name', 'email', 'password', 'department_id', 'designation', 'phone', 'is_active', 'profile_photo_path'])]
@@ -118,7 +117,7 @@ class User extends Authenticatable
     public function getProfilePhotoUrlAttribute(): string
     {
         if ($this->profile_photo_path) {
-            return Storage::url($this->profile_photo_path);
+            return '/storage/'.ltrim($this->profile_photo_path, '/');
         }
         return '';
     }
@@ -143,3 +142,8 @@ class User extends Authenticatable
         return $this->getRoleNames()->values()->all();
     }
 }
+
+
+
+
+

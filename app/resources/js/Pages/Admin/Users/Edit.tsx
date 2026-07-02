@@ -42,6 +42,7 @@ export default function Edit({
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [photoPreview, setPhotoPreview] = useState<string | null>(user.profile_photo_url || null);
+    const [photoPreviewFailed, setPhotoPreviewFailed] = useState(false);
     const [photoUploading, setPhotoUploading] = useState(false);
 
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,6 +65,7 @@ export default function Edit({
                 const updatedUser = (page.props as any).user as User;
                 if (updatedUser?.profile_photo_url) {
                     setPhotoPreview(updatedUser.profile_photo_url);
+                    setPhotoPreviewFailed(false);
                 }
             },
         });
@@ -76,6 +78,7 @@ export default function Edit({
             onFinish: () => {
                 setPhotoUploading(false);
                 setPhotoPreview(null);
+                setPhotoPreviewFailed(false);
             },
         });
     };
@@ -100,8 +103,8 @@ export default function Edit({
                 <div className="mb-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
                     <h2 className="mb-3 text-sm font-semibold text-gray-700">Profile Photo</h2>
                     <div className="flex items-center gap-4">
-                        {photoPreview ? (
-                            <img src={photoPreview} alt={user.name} className="h-16 w-16 rounded-full object-cover" />
+                        {photoPreview && !photoPreviewFailed ? (
+                            <img src={photoPreview} alt={user.name} onError={() => setPhotoPreviewFailed(true)} className="h-16 w-16 rounded-full object-cover" />
                         ) : (
                             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-900 text-lg font-bold text-white">
                                 {user.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) ?? '?'}
@@ -178,3 +181,5 @@ export default function Edit({
         </AuthenticatedLayout>
     );
 }
+
+
