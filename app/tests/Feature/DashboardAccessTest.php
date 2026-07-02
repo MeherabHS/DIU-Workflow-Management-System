@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Project;
+use App\Models\Subtask;
 use App\Models\Task;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
@@ -156,7 +157,7 @@ class DashboardAccessTest extends TestCase
         $this->actingAs($subordinate)->get('/subordinate/dashboard')->assertOk()->assertSee('My Work Items')->assertSee('Update Progress');
     }
 
-    public function test_admin_dashboard_status_overview_and_total_tasks_payload_use_current_data(): void
+    public function test_admin_dashboard_status_overview_and_total_tasks_payload_use_current_project_workflow_count(): void
     {
         $admin = User::factory()->create();
         $admin->syncRoles(['Admin']);
@@ -166,7 +167,8 @@ class DashboardAccessTest extends TestCase
         Project::factory()->create(['status' => 'submitted']);
         Project::factory()->create(['status' => 'active']);
         Project::factory()->create(['status' => 'planned']);
-        Task::factory()->count(3)->for($inProgress)->create();
+        $task = Task::factory()->for($inProgress)->create();
+        Subtask::factory()->for($task)->create(['project_id' => $inProgress->id]);
 
         $this->actingAs($admin)
             ->get('/admin/dashboard')
@@ -178,8 +180,29 @@ class DashboardAccessTest extends TestCase
                 ->where('statusData.1.name', 'In Progress')
                 ->where('statusData.1.value', 3)
                 ->where('kpis.4.label', 'Total Tasks')
-                ->where('kpis.4.value', Task::count())
+                ->where('kpis.4.value', 3)
                 ->where('statusData', fn ($statusData) => ! collect($statusData)->contains('name', 'Active')));
+    }
+
+    public function test_pm_dashboard_total_tasks_counts_only_managed_workflow_projects_and_ignores_tasks_and_work_items(): void
+    {
+        $pm = User::factory()->create();
+        $pm->syncRoles(['PM/Manager']);
+
+        $managedOne = Project::factory()->create(['created_by' => $pm->id, 'status' => 'in_progress']);
+        Project::factory()->create(['created_by' => $pm->id, 'status' => 'completed']);
+        Project::factory()->create(['created_by' => $pm->id, 'status' => 'planned']);
+        Project::factory()->create(['status' => 'submitted']);
+        $task = Task::factory()->for($managedOne)->create();
+        Subtask::factory()->for($task)->create(['project_id' => $managedOne->id]);
+
+        $this->actingAs($pm)
+            ->get('/pm/dashboard')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Dashboards/PM')
+                ->where('kpis.4.label', 'Total Tasks')
+                ->where('kpis.4.value', 2));
     }
 
     public function test_user_without_role_does_not_see_role_dashboard_links(): void

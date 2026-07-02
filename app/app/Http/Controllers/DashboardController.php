@@ -6,7 +6,6 @@ use App\Helpers\CacheHelper;
 use App\Models\Department;
 use App\Models\Project;
 use App\Models\Subtask;
-use App\Models\Task;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -60,11 +59,14 @@ class DashboardController extends Controller
     public function pm(): Response
     {
         app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
-        // PM/Manager sees all projects (same as Admin)
         $userId = auth()->id();
+        $projectIds = Project::query()
+            ->where('created_by', $userId)
+            ->pluck('id');
         $data = CacheHelper::rememberDashboard(
-            fn () => $this->computeDashboardData(null),
-            $userId
+            fn () => $this->computeDashboardData($projectIds),
+            $userId,
+            $projectIds->all()
         );
 
         return Inertia::render('Dashboards/PM', [
@@ -83,19 +85,19 @@ class DashboardController extends Controller
         $now = now()->toDateString();
         $doneStatuses = ['completed', 'archived', 'cancelled'];
 
-        // KPI: In Progress — projects with status in_progress or submitted
+        // KPI: In Progress - projects with status in_progress or submitted
         $inProgress = Project::query()
             ->whereIn('status', ['in_progress', 'submitted'])
             ->when($scopedProjectIds, fn ($q) => $q->whereIn('id', $scopedProjectIds))
             ->count();
 
-        // KPI: Completed — projects with status completed
+        // KPI: Completed - projects with status completed
         $completed = Project::query()
             ->where('status', 'completed')
             ->when($scopedProjectIds, fn ($q) => $q->whereIn('id', $scopedProjectIds))
             ->count();
 
-        // KPI: Due — projects not done, deadline is today or future
+        // KPI: Due - projects not done, deadline is today or future
         $due = Project::query()
             ->whereNotNull('deadline')
             ->where('deadline', '>=', $now)
@@ -103,7 +105,7 @@ class DashboardController extends Controller
             ->when($scopedProjectIds, fn ($q) => $q->whereIn('id', $scopedProjectIds))
             ->count();
 
-        // KPI: Overdue — projects not done, deadline is before today
+        // KPI: Overdue - projects not done, deadline is before today
         $overdue = Project::query()
             ->whereNotNull('deadline')
             ->where('deadline', '<', $now)
@@ -111,9 +113,10 @@ class DashboardController extends Controller
             ->when($scopedProjectIds, fn ($q) => $q->whereIn('id', $scopedProjectIds))
             ->count();
 
-        // KPI: Total Tasks — real count from tasks table
-        $totalTasks = Task::query()
-            ->when($scopedProjectIds, fn ($q) => $q->whereIn('project_id', $scopedProjectIds))
+        // KPI: Total Tasks - project-tracking count for active workflow projects
+        $totalTasks = Project::query()
+            ->whereIn('status', ['in_progress', 'submitted', 'completed'])
+            ->when($scopedProjectIds, fn ($q) => $q->whereIn('id', $scopedProjectIds))
             ->count();
 
         $kpis = [
@@ -124,7 +127,7 @@ class DashboardController extends Controller
             ['label' => 'Total Tasks', 'value' => $totalTasks, 'color' => 'purple'],
         ];
 
-        // Project glance: priority-filtered (urgent/high/medium), sorted by overdue → priority → deadline
+        // Project glance: priority-filtered (urgent/high/medium), sorted by overdue -> priority -> deadline
         $priorityOrder = ['urgent' => 0, 'high' => 1, 'medium' => 2];
 
         $projectQuery = Project::query()
