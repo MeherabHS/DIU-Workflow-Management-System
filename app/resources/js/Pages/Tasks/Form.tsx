@@ -54,7 +54,7 @@ export default function Form({ project, task, pageTitle, submitLabel, method, ac
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                     <p className="text-sm font-semibold text-gray-900">Required Project Report / Attachment</p>
-                                    <p className="text-xs text-gray-500">Optional setup file. Max {maxFileSizeMb} MB.</p>
+                                    <p className="text-xs text-gray-500">Maximum file size: {maxFileSizeMb}MB</p>
                                 </div>
                                 <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50">
                                     <Paperclip className="h-4 w-4" />
@@ -71,3 +71,4 @@ export default function Form({ project, task, pageTitle, submitLabel, method, ac
         </AuthenticatedLayout>
     );
 }
+

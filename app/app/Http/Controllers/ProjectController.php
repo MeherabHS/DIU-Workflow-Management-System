@@ -17,6 +17,7 @@ use App\Models\WorkflowComparisonConfig;
 use App\Models\WorkflowComparisonResult;
 use App\Models\WorkflowFile;
 use App\Services\AuditLogService;
+use App\Services\WorkflowFileService;
 use App\Services\WorkflowNotificationService;
 use App\Support\ProjectStatus;
 use Illuminate\Http\RedirectResponse;
@@ -101,16 +102,18 @@ class ProjectController extends Controller
                 'created_by' => $request->user()->id,
             ]);
 
-            // Auto-create a linked repository entry so every project is preserved in Repository
-            RepositoryEntry::create([
-                'project_id' => $project->id,
-                'title' => $project->title,
-                'description' => $project->description,
-                'department_id' => $project->department_id,
-                'status' => $this->mapProjectToRepositoryStatus($project->status ?? 'planned'),
-                'created_by' => $request->user()->id,
-                'value_currency' => 'BDT',
-            ]);
+            // Auto-create a linked repository entry so every project is preserved in Repository.
+            RepositoryEntry::firstOrCreate(
+                ['project_id' => $project->id],
+                [
+                    'title' => $project->title,
+                    'description' => $project->description,
+                    'department_id' => $project->department_id,
+                    'status' => $this->mapProjectToRepositoryStatus($project->status ?? 'planned'),
+                    'created_by' => $request->user()->id,
+                    'value_currency' => 'BDT',
+                ]
+            );
 
             if ($uploadedFile) {
                 $this->authorize('create', [WorkflowFile::class, $project]);
@@ -245,7 +248,12 @@ class ProjectController extends Controller
 
         DB::transaction(function () use ($request, $project, $activeAssignment, $coordinatorId, $notificationService): void {
             if ($activeAssignment) {
+                $oldCoordinator = $activeAssignment->coordinator;
                 $activeAssignment->update(['revoked_at' => now()]);
+
+                if ($oldCoordinator) {
+                    $notificationService->notifyCoordinatorRevoked($project, $oldCoordinator, $request->user());
+                }
             }
 
             ProjectAssignment::create([
@@ -352,21 +360,40 @@ class ProjectController extends Controller
             );
         }
 
-        $entry = RepositoryEntry::create([
-            'project_id' => $project->id,
-            'title' => $project->title,
-            'description' => $project->description,
-            'final_summary' => $finalSummary,
-            'department_id' => $project->department_id,
-            'responsible_user_id' => $coordinator?->id,
-            'status' => 'completed',
-            'completed_at' => now(),
-            'finalized_at' => now(),
-            'finalized_by' => $request->user()->id,
-            'created_by' => $request->user()->id,
-            'value_currency' => 'BDT',
-            'final_status_snapshot' => $snapshot,
-        ]);
+        $entry = RepositoryEntry::where('project_id', $project->id)
+            ->whereNull('finalized_at')
+            ->first();
+        $now = now();
+
+        if ($entry) {
+            $entry->update([
+                'final_summary' => $finalSummary,
+                'department_id' => $entry->department_id ?? $project->department_id,
+                'responsible_user_id' => $entry->responsible_user_id ?? $coordinator?->id,
+                'status' => 'completed',
+                'completed_at' => $entry->completed_at ?? $now,
+                'finalized_at' => $now,
+                'finalized_by' => $request->user()->id,
+                'value_currency' => $entry->value_currency ?: 'BDT',
+                'final_status_snapshot' => $snapshot,
+            ]);
+        } else {
+            $entry = RepositoryEntry::create([
+                'project_id' => $project->id,
+                'title' => $project->title,
+                'description' => $project->description,
+                'final_summary' => $finalSummary,
+                'department_id' => $project->department_id,
+                'responsible_user_id' => $coordinator?->id,
+                'status' => 'completed',
+                'completed_at' => $now,
+                'finalized_at' => $now,
+                'finalized_by' => $request->user()->id,
+                'created_by' => $request->user()->id,
+                'value_currency' => 'BDT',
+                'final_status_snapshot' => $snapshot,
+            ]);
+        }
 
         // Link project-level workflow files to the repository entry (no duplication)
         $project->files()
@@ -445,6 +472,8 @@ class ProjectController extends Controller
             'project' => $project,
             'departments' => Department::query()->where('is_active', true)->orderBy('name')->get(),
             'statuses' => $this->statuses(),
+            'allowedFileTypes' => app(WorkflowFileService::class)->acceptAttribute(),
+            'maxFileSizeMb' => app(WorkflowFileService::class)->maxUploadMegabytes(),
         ];
     }
 
@@ -459,22 +488,18 @@ class ProjectController extends Controller
     }
     protected function storeInitialProjectFile(Request $request, Project $project, mixed $uploadedFile): void
     {
-        $extension = strtolower($uploadedFile->getClientOriginalExtension());
-        $storedName = Str::uuid().($extension ? '.'.$extension : '');
-        $directory = 'workflow-files/'.now()->format('Y/m');
-        $path = $uploadedFile->storeAs($directory, $storedName, 'local');
+        $file = app(WorkflowFileService::class)->storeUploadedFile(
+            $uploadedFile,
+            $project,
+            $request->user(),
+            'attachment'
+        );
 
-        WorkflowFile::create([
-            'project_id' => $project->id,
-            'uploaded_by' => $request->user()->id,
-            'original_name' => $uploadedFile->getClientOriginalName(),
-            'stored_name' => $storedName,
-            'disk' => 'local',
-            'path' => $path,
-            'mime_type' => $uploadedFile->getMimeType(),
-            'size' => $uploadedFile->getSize(),
-            'file_category' => 'attachment',
-        ]);
+        app(WorkflowNotificationService::class)->notifyFileUploaded($file);
     }
 }
+
+
+
+
 

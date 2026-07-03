@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ProvidesWorkflowFiles;
-
 use App\Http\Requests\StoreRepositoryEntryRequest;
 use App\Http\Requests\StoreRepositoryUpdateRequest;
 use App\Http\Requests\UpdateRepositoryEntryRequest;
@@ -22,11 +21,11 @@ use Inertia\Response;
 class RepositoryController extends Controller
 {
     use ProvidesWorkflowFiles;
+
     public function index(Request $request): Response
     {
         abort_unless($request->user()?->can('view repository'), 403);
 
-        // Validate search/filter inputs
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
             'status' => ['nullable', Rule::in(ProjectStatus::repositoryStatuses())],
@@ -38,13 +37,9 @@ class RepositoryController extends Controller
             ->with(['department', 'responsibleUser', 'creator', 'project'])
             ->latest('updated_at');
 
-        // Scope repository entries by Coordinator assignment
         if ($user->hasRole('Coordinator') && ! $user->hasAnyRole(['Admin', 'PM/Manager'])) {
             $assignedProjectIds = $user->activeAssignedProjects()->pluck('projects.id');
-            $query->where(function ($q) use ($assignedProjectIds): void {
-                $q->whereNull('project_id')
-                    ->orWhereIn('project_id', $assignedProjectIds);
-            });
+            $query->whereIn('project_id', $assignedProjectIds);
         }
 
         if ($search = $request->string('search')->toString()) {
@@ -139,7 +134,7 @@ class RepositoryController extends Controller
 
     public function show(Request $request, RepositoryEntry $repositoryEntry): Response
     {
-        abort_unless($request->user()?->can('view repository'), 403);
+        abort_unless($this->canViewRepositoryEntry($request->user(), $repositoryEntry), 403);
 
         $repositoryEntry->load(['department', 'responsibleUser', 'creator', 'project', 'updates.user', 'finalizedBy']);
 
@@ -167,7 +162,8 @@ class RepositoryController extends Controller
 
     public function edit(RepositoryEntry $repositoryEntry): Response
     {
-        abort_unless(auth()->user()?->can('update repository entry'), 403);
+        $user = auth()->user();
+        abort_unless($this->canUpdateRepositoryEntry($user, $repositoryEntry), 403);
 
         return Inertia::render('Repository/Form', $this->formData($repositoryEntry) + [
             'pageTitle' => 'Edit Repository Entry',
@@ -179,6 +175,8 @@ class RepositoryController extends Controller
 
     public function update(UpdateRepositoryEntryRequest $request, RepositoryEntry $repositoryEntry): RedirectResponse
     {
+        abort_unless($this->canUpdateRepositoryEntry($request->user(), $repositoryEntry), 403);
+
         $repositoryEntry->update([
             ...$request->validated(),
             'value_currency' => $request->validated('value_currency') ?: 'BDT',
@@ -189,6 +187,8 @@ class RepositoryController extends Controller
 
     public function storeUpdate(StoreRepositoryUpdateRequest $request, RepositoryEntry $repositoryEntry): RedirectResponse
     {
+        abort_unless($this->canAddRepositoryUpdate($request->user(), $repositoryEntry), 403);
+
         DB::transaction(function () use ($request, $repositoryEntry): void {
             $currentStatus = $repositoryEntry->status;
             $newStatus = $request->validated('new_status');
@@ -243,13 +243,40 @@ class RepositoryController extends Controller
                 ProjectStatus::repositoryStatuses()
             )
         );
-    }}
+    }
 
+    private function canViewRepositoryEntry(?User $user, RepositoryEntry $entry): bool
+    {
+        if (! $user || ! $user->can('view repository')) {
+            return false;
+        }
 
+        if ($user->hasAnyRole(['Admin', 'PM/Manager'])) {
+            return true;
+        }
 
+        if (! $user->hasRole('Coordinator') || $entry->project_id === null) {
+            return false;
+        }
 
+        return $entry->project?->assignments()
+            ->where('assignment_role', 'primary')
+            ->whereNull('revoked_at')
+            ->where('coordinator_id', $user->id)
+            ->exists() ?? false;
+    }
 
+    private function canUpdateRepositoryEntry(?User $user, RepositoryEntry $entry): bool
+    {
+        return $user !== null
+            && $user->can('update repository entry')
+            && $this->canViewRepositoryEntry($user, $entry);
+    }
 
-
-
-
+    private function canAddRepositoryUpdate(?User $user, RepositoryEntry $entry): bool
+    {
+        return $user !== null
+            && $user->can('add repository update')
+            && $this->canViewRepositoryEntry($user, $entry);
+    }
+}

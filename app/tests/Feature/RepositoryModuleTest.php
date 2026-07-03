@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Department;
+use App\Models\Project;
+use App\Models\ProjectAssignment;
 use App\Models\RepositoryEntry;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
@@ -329,5 +331,208 @@ class RepositoryModuleTest extends TestCase
 
         $this->assertDatabaseHas('repository_entries', ['id' => $entry->id, 'title' => 'Original']);
     }
+    public function test_project_creation_auto_creates_exactly_one_repository_entry(): void
+    {
+        $admin = $this->userWithRole('Admin');
+
+        $this->actingAs($admin)->post(route('projects.store'), [
+            'title' => 'Auto Preserved Project',
+            'description' => 'Preserved at creation.',
+            'status' => 'planned',
+        ])->assertRedirect();
+
+        $project = Project::where('title', 'Auto Preserved Project')->firstOrFail();
+
+        $this->assertSame(1, RepositoryEntry::where('project_id', $project->id)->count());
+        $this->assertDatabaseHas('repository_entries', [
+            'project_id' => $project->id,
+            'title' => 'Auto Preserved Project',
+            'status' => 'planned',
+        ]);
+    }
+
+    public function test_project_creation_maps_in_progress_to_repository_ongoing(): void
+    {
+        $admin = $this->userWithRole('Admin');
+
+        $this->actingAs($admin)->post(route('projects.store'), [
+            'title' => 'Ongoing Repository Project',
+            'status' => 'in_progress',
+        ])->assertRedirect();
+
+        $project = Project::where('title', 'Ongoing Repository Project')->firstOrFail();
+
+        $this->assertDatabaseHas('repository_entries', [
+            'project_id' => $project->id,
+            'status' => 'ongoing',
+        ]);
+    }
+
+    public function test_finalizing_auto_preserved_project_updates_existing_repository_entry(): void
+    {
+        $admin = $this->userWithRole('Admin');
+
+        $this->actingAs($admin)->post(route('projects.store'), [
+            'title' => 'Finalize Existing Repository Entry',
+            'status' => 'planned',
+        ])->assertRedirect();
+
+        $project = Project::where('title', 'Finalize Existing Repository Entry')->firstOrFail();
+        $existingEntry = RepositoryEntry::where('project_id', $project->id)->firstOrFail();
+        $project->update(['status' => 'completed', 'completed_at' => now()]);
+
+        $this->actingAs($admin)->post(route('projects.finalize-to-repository', $project), [
+            'final_summary' => 'Finalized without creating a duplicate.',
+        ])->assertRedirect(route('repository.show', $existingEntry));
+
+        $existingEntry->refresh();
+
+        $this->assertSame(1, RepositoryEntry::where('project_id', $project->id)->count());
+        $this->assertNotNull($existingEntry->finalized_at);
+        $this->assertSame('completed', $existingEntry->status);
+        $this->assertSame('Finalized without creating a duplicate.', $existingEntry->final_summary);
+    }
+
+    public function test_finalized_repository_entry_is_not_overwritten_by_later_project_status_sync(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $project = Project::factory()->create([
+            'created_by' => $admin->id,
+            'status' => 'completed',
+            'completed_at' => now(),
+        ]);
+        $entry = RepositoryEntry::factory()->create([
+            'project_id' => $project->id,
+            'created_by' => $admin->id,
+            'status' => 'completed',
+            'finalized_at' => now(),
+            'finalized_by' => $admin->id,
+        ]);
+
+        $project->update(['status' => 'in_progress']);
+
+        $this->assertSame('completed', $entry->fresh()->status);
+    }
+
+    public function test_backfill_remains_idempotent_for_active_repository_entries(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $project = Project::factory()->create(['created_by' => $admin->id, 'status' => 'in_progress']);
+
+        $this->artisan('repository:backfill')->assertExitCode(0);
+        $this->artisan('repository:backfill')->assertExitCode(0);
+
+        $this->assertSame(1, RepositoryEntry::where('project_id', $project->id)->count());
+        $this->assertSame('ongoing', RepositoryEntry::where('project_id', $project->id)->firstOrFail()->status);
+    }
+
+    public function test_coordinator_can_view_assigned_project_repository_entry(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $coordinator = $this->userWithRole('Coordinator');
+        $project = Project::factory()->create(['created_by' => $admin->id]);
+        $entry = RepositoryEntry::factory()->create(['project_id' => $project->id, 'created_by' => $admin->id]);
+        $this->assignCoordinator($project, $coordinator, $admin);
+
+        $this->actingAs($coordinator)
+            ->get(route('repository.show', $entry))
+            ->assertOk();
+    }
+
+    public function test_coordinator_cannot_access_unassigned_repository_entry_directly(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $coordinator = $this->userWithRole('Coordinator');
+        $project = Project::factory()->create(['created_by' => $admin->id]);
+        $entry = RepositoryEntry::factory()->create(['project_id' => $project->id, 'created_by' => $admin->id]);
+
+        $this->actingAs($coordinator)->get(route('repository.show', $entry))->assertForbidden();
+        $this->actingAs($coordinator)->get(route('repository.edit', $entry))->assertForbidden();
+        $this->actingAs($coordinator)->patch(route('repository.update', $entry), [
+            'title' => 'Blocked Coordinator Update',
+            'status' => 'ongoing',
+            'value_currency' => 'BDT',
+        ])->assertForbidden();
+        $this->actingAs($coordinator)->post(route('repository.updates.store', $entry), [
+            'new_status' => 'submitted',
+            'note' => 'Blocked coordinator update.',
+        ])->assertForbidden();
+    }
+
+    public function test_coordinator_cannot_access_standalone_repository_entry_directly(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $coordinator = $this->userWithRole('Coordinator');
+        $entry = RepositoryEntry::factory()->create(['project_id' => null, 'created_by' => $admin->id]);
+
+        $this->actingAs($coordinator)->get(route('repository.show', $entry))->assertForbidden();
+    }
+
+    public function test_subordinate_cannot_access_repository_entry_directly(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $subordinate = $this->userWithRole('Subordinate');
+        $entry = RepositoryEntry::factory()->create(['created_by' => $admin->id]);
+
+        $this->actingAs($subordinate)->get(route('repository.show', $entry))->assertForbidden();
+        $this->actingAs($subordinate)->get(route('repository.edit', $entry))->assertForbidden();
+        $this->actingAs($subordinate)->patch(route('repository.update', $entry), [
+            'title' => 'Blocked Subordinate Update',
+            'status' => 'ongoing',
+            'value_currency' => 'BDT',
+        ])->assertForbidden();
+        $this->actingAs($subordinate)->post(route('repository.updates.store', $entry), [
+            'new_status' => 'submitted',
+            'note' => 'Blocked subordinate update.',
+        ])->assertForbidden();
+    }
+
+    public function test_admin_and_pm_manager_can_access_repository_entry_directly(): void
+    {
+        $admin = $this->userWithRole('Admin');
+        $pm = $this->userWithRole('PM/Manager');
+        $entry = RepositoryEntry::factory()->create(['created_by' => $admin->id]);
+
+        $this->actingAs($admin)->get(route('repository.show', $entry))->assertOk();
+        $this->actingAs($pm)->get(route('repository.show', $entry))->assertOk();
+        $this->actingAs($pm)->get(route('repository.edit', $entry))->assertOk();
+        $this->actingAs($pm)->post(route('repository.updates.store', $entry), [
+            'new_status' => 'submitted',
+            'note' => 'PM access remains unchanged.',
+        ])->assertRedirect(route('repository.show', $entry));
+    }
+
+    public function test_repository_status_labels_include_ongoing(): void
+    {
+        $admin = $this->userWithRole('Admin');
+
+        $this->actingAs($admin)->get(route('repository.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Repository/Index')
+                ->where('statuses.2.value', 'ongoing')
+                ->where('statuses.2.label', 'Ongoing'));
+    }
+
+    private function userWithRole(string $role): User
+    {
+        $user = User::factory()->create();
+        $user->assignRole($role);
+
+        return $user;
+    }
+
+    private function assignCoordinator(Project $project, User $coordinator, User $assigner): void
+    {
+        ProjectAssignment::create([
+            'project_id' => $project->id,
+            'coordinator_id' => $coordinator->id,
+            'assigned_by' => $assigner->id,
+            'assignment_role' => 'primary',
+            'assigned_at' => now(),
+            'revoked_at' => null,
+        ]);
+    }
 }
+
 

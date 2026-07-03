@@ -8,6 +8,7 @@ use App\Models\RepositoryEntry;
 use App\Models\Subtask;
 use App\Models\Task;
 use App\Models\WorkflowFile;
+use App\Services\WorkflowFileService;
 use App\Services\WorkflowNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -101,42 +102,29 @@ class WorkflowFileController extends Controller
     {
         $this->authorize('delete', $workflowFile);
 
-        // Delete physical file from storage before deleting DB record
-        Storage::disk($workflowFile->disk)->delete($workflowFile->path);
-
-        $workflowFile->delete();
+        app(WorkflowFileService::class)->deleteStoredFile($workflowFile);
 
         return redirect()->back()->with('status', 'File deleted successfully.');
     }
 
     protected function storeForContext(Request $request, Project|Task|Subtask|RepositoryEntry $context, array $contextColumns, string $defaultCategory): RedirectResponse
     {
+        $fileService = app(WorkflowFileService::class);
         $validated = $request->validate([
-            'file' => ['required', 'file', 'max:10240', 'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png,txt,csv,zip'],
+            ...$fileService->validationRules(),
             'file_category' => ['nullable', 'string', Rule::in(['attachment', 'evidence', 'reference', 'repository_document', 'feedback_attachment', 'requirement'])],
             'description' => ['nullable', 'string', 'max:2000'],
         ]);
 
         abort_unless(collect($contextColumns)->filter()->isNotEmpty(), 422);
 
-        $uploadedFile = $validated['file'];
-        $extension = strtolower($uploadedFile->getClientOriginalExtension());
-        $storedName = Str::uuid().($extension ? '.'.$extension : '');
-        $directory = 'workflow-files/'.now()->format('Y/m');
-        $path = $uploadedFile->storeAs($directory, $storedName, 'local');
-
-        $file = WorkflowFile::create([
-            ...$contextColumns,
-            'uploaded_by' => $request->user()->id,
-            'original_name' => $uploadedFile->getClientOriginalName(),
-            'stored_name' => $storedName,
-            'disk' => 'local',
-            'path' => $path,
-            'mime_type' => $uploadedFile->getMimeType(),
-            'size' => $uploadedFile->getSize(),
-            'file_category' => $validated['file_category'] ?? $defaultCategory,
-            'description' => $validated['description'] ?? null,
-        ]);
+        $file = $fileService->storeUploadedFile(
+            $validated['file'],
+            $context,
+            $request->user(),
+            $validated['file_category'] ?? $defaultCategory,
+            $validated['description'] ?? null
+        );
 
         app(WorkflowNotificationService::class)->notifyFileUploaded($file);
 
@@ -160,3 +148,4 @@ class WorkflowFileController extends Controller
         ]);
     }
 }
+

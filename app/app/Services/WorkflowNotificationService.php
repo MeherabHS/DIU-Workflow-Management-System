@@ -23,6 +23,40 @@ class WorkflowNotificationService
     {
         return (string) parse_url(route($name, $params), PHP_URL_PATH);
     }
+    protected function normalizeActionUrl(?string $url): ?string
+    {
+        if ($url === null) {
+            return null;
+        }
+
+        $url = trim($url);
+
+        if ($url === '') {
+            return null;
+        }
+
+        if (str_starts_with($url, '/')) {
+            return preg_match('/[\r\n]/', $url) ? null : $url;
+        }
+
+        if (! preg_match('#^https?://#i', $url)) {
+            return null;
+        }
+
+        $path = parse_url($url, PHP_URL_PATH);
+
+        if (! is_string($path) || $path === '' || ! str_starts_with($path, '/')) {
+            return null;
+        }
+
+        $query = parse_url($url, PHP_URL_QUERY);
+
+        if (is_string($query) && $query !== '') {
+            $path .= '?'.$query;
+        }
+
+        return preg_match('/[\r\n]/', $path) ? null : $path;
+    }
 
     public function notifyUser(User $user, array $data): WorkflowNotification
     {
@@ -37,7 +71,7 @@ class WorkflowNotificationService
             'type' => $data['type'],
             'title' => $data['title'],
             'body' => $data['body'] ?? null,
-            'action_url' => $data['action_url'] ?? null,
+            'action_url' => $this->normalizeActionUrl($data['action_url'] ?? null),
         ]);
     }
 
@@ -47,7 +81,10 @@ class WorkflowNotificationService
     public function notifyMany(Collection|array $users, array $data, ?int $excludeUserId = null): void
     {
         $collection = $users instanceof Collection ? $users : collect($users);
-        $collection = $collection->filter(fn (User $u) => $u->id !== $excludeUserId);
+        $collection = $collection
+            ->filter(fn (User $u) => $u->id !== $excludeUserId)
+            ->unique('id')
+            ->values();
 
         foreach ($collection as $user) {
             $this->notifyUser($user, $data);
@@ -284,4 +321,5 @@ class WorkflowNotificationService
         return $recipients->unique('id');
     }
 }
+
 

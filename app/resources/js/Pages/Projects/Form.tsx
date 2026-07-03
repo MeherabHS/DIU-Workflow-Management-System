@@ -5,7 +5,7 @@ import { Head, useForm } from '@inertiajs/react';
 import { Paperclip } from 'lucide-react';
 import { useRef } from 'react';
 
-export default function Form({ project, departments = [], statuses = [], pageTitle, submitLabel, method, action }: { project: Project; departments: Department[]; statuses: string[]; pageTitle: string; submitLabel: string; method: 'post' | 'patch'; action: string }) {
+export default function Form({ project, departments = [], statuses = [], pageTitle, submitLabel, method, action, allowedFileTypes, maxFileSizeMb = 10 }: { project: Project; departments: Department[]; statuses: string[]; pageTitle: string; submitLabel: string; method: 'post' | 'patch'; action: string; allowedFileTypes?: string; maxFileSizeMb?: number }) {
     const inputRef = useRef<HTMLInputElement>(null);
     const { data, setData, post, patch, processing, errors } = useForm<{ title: string; description: string; department_id: string; status: string; priority: string; start_date: string; deadline: string; file: File | null }>({
         title: project.title || '',
@@ -64,11 +64,11 @@ export default function Form({ project, departments = [], statuses = [], pageTit
                     </div>
                     {method === 'post' && (
                         <div className="rounded-lg border border-gray-200 p-3">
-                            <input ref={inputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.txt,.csv,.zip" className="hidden" onChange={(event) => setData('file', event.target.files?.[0] || null)} />
+                            <input ref={inputRef} type="file" accept={allowedFileTypes} className="hidden" onChange={(event) => setData('file', event.target.files?.[0] || null)} />
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                     <p className="text-sm font-semibold text-gray-900">Required Documents / Attachments</p>
-                                    <p className="text-xs text-gray-500">Optional setup file. Max 10 MB.</p>
+                                    <p className="text-xs text-gray-500">Maximum file size: {maxFileSizeMb}MB</p>
                                 </div>
                                 <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50">
                                     <Paperclip className="h-4 w-4" />
@@ -84,3 +84,5 @@ export default function Form({ project, departments = [], statuses = [], pageTit
         </AuthenticatedLayout>
     );
 }
+
+

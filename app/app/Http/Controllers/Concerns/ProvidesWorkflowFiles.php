@@ -9,6 +9,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\WorkflowFile;
 use App\Services\RequirementDeliverableService;
+use App\Services\WorkflowFileService;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 
@@ -22,8 +23,8 @@ trait ProvidesWorkflowFiles
             'files' => $this->formatWorkflowFiles($this->workflowFilesFor($context), $user),
             'canUploadFile' => $canUploadFile,
             'fileUploadUrl' => $canUploadFile ? $this->workflowFileUploadRoute($context) : null,
-            'allowedFileTypes' => '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.txt,.csv,.zip',
-            'maxFileSizeMb' => 10,
+            'allowedFileTypes' => app(WorkflowFileService::class)->acceptAttribute(),
+            'maxFileSizeMb' => app(WorkflowFileService::class)->maxUploadMegabytes(),
             'fileSectionLabel' => $sectionLabel,
         ];
     }
@@ -110,3 +111,5 @@ trait ProvidesWorkflowFiles
         ];
     }
 }
+
+

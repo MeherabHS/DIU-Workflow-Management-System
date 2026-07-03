@@ -12,7 +12,7 @@ type FileListProps = {
     title?: string;
 };
 
-export default function FileList({ files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, title = 'Attachments' }: FileListProps) {
+export default function FileList({ files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 100, title = 'Attachments' }: FileListProps) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [uploading, setUploading] = useState(false);
 
@@ -43,10 +43,13 @@ export default function FileList({ files = [], canUploadFile = false, fileUpload
                 {canUploadFile && fileUploadUrl && (
                     <>
                         <input ref={inputRef} type="file" accept={allowedFileTypes} className="hidden" onChange={(event) => uploadFile(event.target.files?.[0])} />
-                        <button type="button" disabled={uploading} onClick={() => inputRef.current?.click()} className="inline-flex items-center gap-1 text-sm font-semibold text-gray-900 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-60">
-                            <Upload className="h-3.5 w-3.5" />
-                            {uploading ? 'Uploading' : 'Upload'}
-                        </button>
+                        <div className="flex flex-col items-end gap-1">
+                            <button type="button" disabled={uploading} onClick={() => inputRef.current?.click()} className="inline-flex items-center gap-1 text-sm font-semibold text-gray-900 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-60">
+                                <Upload className="h-3.5 w-3.5" />
+                                {uploading ? 'Uploading' : 'Upload'}
+                            </button>
+                            <span className="text-xs text-gray-500">Maximum file size: {maxFileSizeMb}MB</span>
+                        </div>
                     </>
                 )}
             </div>
@@ -66,3 +69,4 @@ export default function FileList({ files = [], canUploadFile = false, fileUpload
         </section>
     );
 }
+

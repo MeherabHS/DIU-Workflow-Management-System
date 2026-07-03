@@ -13,6 +13,8 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\WorkflowFile;
 use App\Services\AuditLogService;
+use App\Services\WorkflowFileService;
+use App\Services\WorkflowNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -58,8 +60,8 @@ class TaskController extends Controller
             'method' => 'post',
             'action' => route('project.tasks.store', $project),
             'canAttachOnCreate' => $request->user()->can('create', [WorkflowFile::class, $project]),
-            'allowedFileTypes' => '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.txt,.csv,.zip',
-            'maxFileSizeMb' => 10,
+            'allowedFileTypes' => app(WorkflowFileService::class)->acceptAttribute(),
+            'maxFileSizeMb' => app(WorkflowFileService::class)->maxUploadMegabytes(),
         ]);
     }
 
@@ -175,22 +177,16 @@ class TaskController extends Controller
 
     protected function storeInitialTaskFile(Request $request, Task $task, mixed $uploadedFile): void
     {
-        $extension = strtolower($uploadedFile->getClientOriginalExtension());
-        $storedName = Str::uuid().($extension ? '.'.$extension : '');
-        $directory = 'workflow-files/'.now()->format('Y/m');
-        $path = $uploadedFile->storeAs($directory, $storedName, 'local');
+        $file = app(WorkflowFileService::class)->storeUploadedFile(
+            $uploadedFile,
+            $task,
+            $request->user(),
+            'attachment'
+        );
 
-        WorkflowFile::create([
-            'project_id' => $task->project_id,
-            'task_id' => $task->id,
-            'uploaded_by' => $request->user()->id,
-            'original_name' => $uploadedFile->getClientOriginalName(),
-            'stored_name' => $storedName,
-            'disk' => 'local',
-            'path' => $path,
-            'mime_type' => $uploadedFile->getMimeType(),
-            'size' => $uploadedFile->getSize(),
-            'file_category' => 'attachment',
-        ]);
+        app(WorkflowNotificationService::class)->notifyFileUploaded($file);
     }
 }
+
+
+

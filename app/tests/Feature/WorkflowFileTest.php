@@ -10,6 +10,7 @@ use App\Models\SubtaskAssignment;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\WorkflowFile;
+use App\Services\WorkflowFileService;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -155,7 +156,7 @@ class WorkflowFileTest extends TestCase
         $project = Project::factory()->create();
 
         $this->actingAs($admin)->post(route('projects.files.store', $project), $this->uploadPayload([
-            'file' => UploadedFile::fake()->create('large.pdf', 10241, 'application/pdf'),
+            'file' => UploadedFile::fake()->create('large.pdf', 102401, 'application/pdf'),
         ]))->assertSessionHasErrors('file');
     }
 
@@ -352,6 +353,175 @@ class WorkflowFileTest extends TestCase
         $this->get('/storage/'.$file->path)->assertStatus(403);
     }
 
+
+    public function test_workflow_file_service_exposes_current_allowed_extensions_and_limits(): void
+    {
+        $service = app(WorkflowFileService::class);
+
+        $this->assertSame([
+            'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip', 'png', 'jpg', 'jpeg', 'webp', 'txt', 'csv',
+        ], $service->allowedExtensions());
+        $this->assertSame(102400, $service->maxUploadKilobytes());
+        $this->assertSame(100, $service->maxUploadMegabytes());
+        $this->assertSame('.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.png,.jpg,.jpeg,.webp,.txt,.csv', $service->acceptAttribute());
+    }
+
+    public function test_normal_project_task_subtask_and_repository_file_endpoints_create_workflow_files(): void
+    {
+        $admin = $this->makeAdmin('admin-all-endpoints@example.com');
+        $project = Project::factory()->create();
+        $task = Task::factory()->for($project)->create();
+        $subtask = Subtask::factory()->for($project)->for($task)->create();
+        $entry = RepositoryEntry::factory()->for($project)->create();
+
+        $this->actingAs($admin)->post(route('projects.files.store', $project), $this->uploadPayload(['file' => UploadedFile::fake()->create('project.pdf', 10, 'application/pdf')]))->assertRedirect();
+        $this->actingAs($admin)->post(route('tasks.files.store', $task), $this->uploadPayload(['file' => UploadedFile::fake()->create('task.pdf', 10, 'application/pdf')]))->assertRedirect();
+        $this->actingAs($admin)->post(route('subtasks.files.store', $subtask), $this->uploadPayload(['file' => UploadedFile::fake()->create('subtask.pdf', 10, 'application/pdf')]))->assertRedirect();
+        $this->actingAs($admin)->post(route('repository.files.store', $entry), $this->uploadPayload(['file' => UploadedFile::fake()->create('repository.pdf', 10, 'application/pdf')]))->assertRedirect();
+
+        $this->assertDatabaseHas('workflow_files', ['project_id' => $project->id, 'task_id' => null, 'subtask_id' => null, 'repository_entry_id' => null, 'original_name' => 'project.pdf']);
+        $this->assertDatabaseHas('workflow_files', ['task_id' => $task->id, 'original_name' => 'task.pdf']);
+        $this->assertDatabaseHas('workflow_files', ['subtask_id' => $subtask->id, 'original_name' => 'subtask.pdf']);
+        $this->assertDatabaseHas('workflow_files', ['repository_entry_id' => $entry->id, 'original_name' => 'repository.pdf']);
+    }
+
+    public function test_allowed_workflow_file_types_are_accepted(): void
+    {
+        $admin = $this->makeAdmin('admin-valid-types@example.com');
+        $project = Project::factory()->create();
+
+        $files = [
+            ['valid.pdf', 'application/pdf'],
+            ['valid.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+            ['valid.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+            ['valid.pptx', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+            ['valid.zip', 'application/zip'],
+            ['valid.png', 'image/png'],
+            ['valid.jpg', 'image/jpeg'],
+            ['valid.jpeg', 'image/jpeg'],
+            ['valid.webp', 'image/webp'],
+            ['valid.txt', 'text/plain'],
+            ['valid.csv', 'text/csv'],
+        ];
+
+        foreach ($files as [$name, $mime]) {
+            $this->actingAs($admin)
+                ->post(route('projects.files.store', $project), $this->uploadPayload([
+                    'file' => UploadedFile::fake()->create($name, 10, $mime),
+                ]))
+                ->assertSessionHasNoErrors()
+                ->assertRedirect();
+        }
+
+        foreach ($files as [$name]) {
+            $this->assertDatabaseHas('workflow_files', ['original_name' => $name]);
+        }
+    }
+
+    public function test_dangerous_workflow_file_types_are_rejected(): void
+    {
+        $admin = $this->makeAdmin('admin-dangerous-types@example.com');
+        $project = Project::factory()->create();
+
+        $files = [
+            ['unsafe.php', 'application/x-php'],
+            ['unsafe.js', 'application/javascript'],
+            ['unsafe.html', 'text/html'],
+            ['unsafe.svg', 'image/svg+xml'],
+            ['unsafe.exe', 'application/vnd.microsoft.portable-executable'],
+            ['unsafe.bat', 'application/x-msdos-program'],
+            ['unsafe.cmd', 'text/plain'],
+            ['unsafe.sh', 'application/x-sh'],
+        ];
+
+        foreach ($files as [$name, $mime]) {
+            $this->actingAs($admin)
+                ->post(route('projects.files.store', $project), $this->uploadPayload([
+                    'file' => UploadedFile::fake()->create($name, 1, $mime),
+                ]))
+                ->assertSessionHasErrors('file');
+        }
+    }
+
+
+    public function test_all_upload_paths_accept_valid_file_under_one_hundred_mb(): void
+    {
+        $admin = $this->makeAdmin('admin-under-100mb@example.com');
+        $subordinate = $this->makeSubordinate('sub-under-100mb@example.com');
+        $project = Project::factory()->create();
+        $task = Task::factory()->for($project)->create();
+        $subtask = Subtask::factory()->for($project)->for($task)->create();
+        $entry = RepositoryEntry::factory()->for($project)->create();
+        $this->assignSubtask($subtask, $subordinate, $admin);
+
+        $this->actingAs($admin)->post(route('projects.store'), [
+            'title' => 'Project Under 100MB',
+            'status' => 'planned',
+            'file' => UploadedFile::fake()->create('project-under-limit.pdf', 99000, 'application/pdf'),
+        ])->assertSessionHasNoErrors()->assertRedirect();
+
+        $this->actingAs($admin)->post(route('project.tasks.store', $project), [
+            'title' => 'Task Under 100MB',
+            'status' => 'pending',
+            'file' => UploadedFile::fake()->create('task-initial-under-limit.pdf', 99000, 'application/pdf'),
+        ])->assertSessionHasNoErrors()->assertRedirect();
+
+        $this->actingAs($admin)->post(route('projects.files.store', $project), $this->uploadPayload([
+            'file' => UploadedFile::fake()->create('project-endpoint-under-limit.pdf', 99000, 'application/pdf'),
+        ]))->assertSessionHasNoErrors()->assertRedirect();
+
+        $this->actingAs($admin)->post(route('tasks.files.store', $task), $this->uploadPayload([
+            'file' => UploadedFile::fake()->create('task-endpoint-under-limit.pdf', 99000, 'application/pdf'),
+        ]))->assertSessionHasNoErrors()->assertRedirect();
+
+        $this->actingAs($subordinate)->post(route('subtasks.files.store', $subtask), $this->uploadPayload([
+            'file' => UploadedFile::fake()->create('work-item-under-limit.pdf', 99000, 'application/pdf'),
+        ]))->assertSessionHasNoErrors()->assertRedirect();
+
+        $this->actingAs($admin)->post(route('repository.files.store', $entry), $this->uploadPayload([
+            'file' => UploadedFile::fake()->create('repository-under-limit.pdf', 99000, 'application/pdf'),
+        ]))->assertSessionHasNoErrors()->assertRedirect();
+
+        foreach ([
+            'project-under-limit.pdf',
+            'task-initial-under-limit.pdf',
+            'project-endpoint-under-limit.pdf',
+            'task-endpoint-under-limit.pdf',
+            'work-item-under-limit.pdf',
+            'repository-under-limit.pdf',
+        ] as $name) {
+            $this->assertDatabaseHas('workflow_files', ['original_name' => $name]);
+        }
+    }
+    public function test_repository_standalone_file_access_remains_admin_pm_only(): void
+    {
+        $admin = $this->makeAdmin('admin-standalone-file@example.com');
+        $pm = $this->makePm('pm-standalone-file@example.com');
+        $coordinator = $this->makeCoordinator('coord-standalone-file@example.com');
+        $subordinate = $this->makeSubordinate('sub-standalone-file@example.com');
+        $entry = RepositoryEntry::factory()->create(['project_id' => null]);
+        $file = $this->makeWorkflowFile($entry, $admin, 'standalone-repository.pdf');
+
+        $this->actingAs($admin)->get(route('workflow-files.download', $file))->assertOk();
+        $this->actingAs($pm)->get(route('workflow-files.download', $file))->assertOk();
+        $this->actingAs($coordinator)->get(route('workflow-files.download', $file))->assertForbidden();
+        $this->actingAs($subordinate)->get(route('workflow-files.download', $file))->assertForbidden();
+    }
+
+    public function test_file_upload_accept_props_match_workflow_file_service(): void
+    {
+        $admin = $this->makeAdmin('admin-accept-props@example.com');
+        $project = Project::factory()->create();
+        $expected = app(WorkflowFileService::class)->acceptAttribute();
+
+        $this->actingAs($admin)->get(route('projects.create'))->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('allowedFileTypes', $expected)
+            ->where('maxFileSizeMb', 100));
+
+        $this->actingAs($admin)->get(route('project.tasks.create', $project))->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('allowedFileTypes', $expected)
+            ->where('maxFileSizeMb', 100));
+    }
     protected function uploadPayload(array $overrides = []): array
     {
         return $overrides + [
@@ -438,6 +608,11 @@ class WorkflowFileTest extends TestCase
         return $user;
     }
 }
+
+
+
+
+
 
 
 

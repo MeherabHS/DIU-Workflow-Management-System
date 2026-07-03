@@ -5,7 +5,9 @@ import { dateText, humanize } from '@/lib/utils';
 import { RepositoryEntry } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 
-export default function Show({ entry, statuses = [], files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 10, fileSectionLabel = 'Attachments' }: { entry: RepositoryEntry; statuses: string[]; files?: any[]; canUploadFile?: boolean; fileUploadUrl?: string | null; allowedFileTypes?: string; maxFileSizeMb?: number; fileSectionLabel?: string }) {
+type RepositoryStatusOption = { value: string; label: string };
+
+export default function Show({ entry, statuses = [], files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 10, fileSectionLabel = 'Attachments' }: { entry: RepositoryEntry; statuses: RepositoryStatusOption[]; files?: any[]; canUploadFile?: boolean; fileUploadUrl?: string | null; allowedFileTypes?: string; maxFileSizeMb?: number; fileSectionLabel?: string }) {
     const { data, setData, post, processing, errors } = useForm({ update_type: 'status_update', new_status: '', note: '' });
 
     function submit(event: React.FormEvent) {
@@ -88,7 +90,7 @@ export default function Show({ entry, statuses = [], files = [], canUploadFile =
                 <form onSubmit={submit} className="mt-4 space-y-4">
                     <div className="grid gap-4 md:grid-cols-2">
                         <div><label className="text-sm font-semibold">Update Type</label><input value={data.update_type} onChange={(event) => setData('update_type', event.target.value)} className="mt-1 w-full rounded-lg border-gray-300 shadow-sm" /></div>
-                        <div><label className="text-sm font-semibold">New Status</label><select value={data.new_status} onChange={(event) => setData('new_status', event.target.value)} className="mt-1 w-full rounded-lg border-gray-300 shadow-sm"><option value="">No status change</option>{statuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></div>
+                        <div><label className="text-sm font-semibold">New Status</label><select value={data.new_status} onChange={(event) => setData('new_status', event.target.value)} className="mt-1 w-full rounded-lg border-gray-300 shadow-sm"><option value="">No status change</option>{statuses.filter((status) => status.value).map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select></div>
                     </div>
                     <div><label className="text-sm font-semibold">Note</label><textarea rows={4} value={data.note} onChange={(event) => setData('note', event.target.value)} className="mt-1 w-full rounded-lg border-gray-300 shadow-sm" />{errors.note && <p className="text-sm text-red-600">{errors.note}</p>}</div>
                     <button disabled={processing} className={buttonClass.primary}>Add Update</button>
@@ -97,3 +99,4 @@ export default function Show({ entry, statuses = [], files = [], canUploadFile =
         </AuthenticatedLayout>
     );
 }
+

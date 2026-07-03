@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # ── Composer ────────────────────────────────────────────────────────────────
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# PHP upload limits stay above Laravel's 2MB profile photo validation limit.
+# PHP upload limits stay above Laravel's 100MB workflow-file validation limit.
 COPY docker/php/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
 
 # ── Node.js 22 ──────────────────────────────────────────────────────────────
@@ -54,3 +54,4 @@ RUN chmod +x /app/start.sh
 EXPOSE 8000
 
 CMD ["bash", "/app/start.sh"]
+

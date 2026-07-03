@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Services\WorkflowFileService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -20,7 +21,8 @@ class StoreTaskRequest extends FormRequest
             'status' => ['required', 'string', Rule::in(['pending', 'in_progress', 'submitted', 'approved', 'revision_required', 'completed', 'cancelled'])],
             'priority' => ['nullable', 'string', 'max:50'],
             'deadline' => ['nullable', 'date'],
-            'file' => ['nullable', 'file', 'max:10240', 'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png,txt,csv,zip'],
+            'file' => app(WorkflowFileService::class)->validationRules(false)['file'],
         ];
     }
 }
+

@@ -116,8 +116,9 @@ React pages map directly to Laravel controller actions:
 - `start.sh` clears config, runs migrations, syncs role permissions, links public storage, clears optimized caches, and starts Laravel on `${PORT:-8000}`.
 - `php artisan storage:link` is expected so profile photos can be served from `/storage/...`.
 - Workflow files are stored on the local/private disk and downloaded through authorized Laravel routes.
-- Profile photos use the public disk. On free prototype services, persistent storage may reset across redeploys unless a persistent disk is configured.
-- Docker PHP upload limits are set above the app-level 2 MB profile photo validation limit so Laravel can return clear validation errors.
+- Workflow file uploads support up to 100 MB. Configure Render Persistent Disk or S3/R2-compatible object storage for production persistence; local container storage may be lost on redeploy without persistent storage.
+- Profile photos use the public disk and remain limited to 2 MB. On free prototype services, persistent storage may reset across redeploys unless a persistent disk is configured.
+- Docker PHP upload limits are set above the app-level 100 MB workflow file validation limit so Laravel can return clear validation errors.
 - Use production-safe environment values for handover, especially `APP_DEBUG=false`, a real `APP_URL`, and database credentials managed by the host.
 
 ## Future Development Rules

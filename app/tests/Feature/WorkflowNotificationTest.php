@@ -577,6 +577,200 @@ class WorkflowNotificationTest extends TestCase
         $this->assertEquals($expectedPath, $notification->action_url);
     }
 
+
+    public function test_notify_user_converts_absolute_action_url_to_relative_path(): void
+    {
+        $user = $this->makeCoordinator('absolute-url@example.com');
+
+        app(WorkflowNotificationService::class)->notifyUser($user, [
+            'type' => 'message_created',
+            'title' => 'Absolute URL Test',
+            'action_url' => 'https://example.com/projects/15?tab=files',
+        ]);
+
+        $this->assertSame('/projects/15?tab=files', WorkflowNotification::latest()->first()->action_url);
+    }
+
+    public function test_notify_user_converts_localhost_action_url_to_relative_path(): void
+    {
+        $user = $this->makeCoordinator('localhost-url@example.com');
+
+        app(WorkflowNotificationService::class)->notifyUser($user, [
+            'type' => 'message_created',
+            'title' => 'Localhost URL Test',
+            'action_url' => 'http://localhost:8000/tasks/9',
+        ]);
+
+        $this->assertSame('/tasks/9', WorkflowNotification::latest()->first()->action_url);
+    }
+
+    public function test_notify_user_keeps_valid_relative_action_url_unchanged(): void
+    {
+        $user = $this->makeCoordinator('relative-url@example.com');
+
+        app(WorkflowNotificationService::class)->notifyUser($user, [
+            'type' => 'message_created',
+            'title' => 'Relative URL Test',
+            'action_url' => '/projects/7',
+        ]);
+
+        $this->assertSame('/projects/7', WorkflowNotification::latest()->first()->action_url);
+    }
+
+    public function test_notify_user_converts_empty_or_malformed_action_url_to_null(): void
+    {
+        $user = $this->makeCoordinator('malformed-url@example.com');
+
+        app(WorkflowNotificationService::class)->notifyUser($user, [
+            'type' => 'message_created',
+            'title' => 'Malformed URL Test',
+            'action_url' => 'javascript:alert(1)',
+        ]);
+
+        $this->assertNull(WorkflowNotification::latest()->first()->action_url);
+    }
+
+    public function test_notify_many_deduplicates_duplicate_users_within_one_call(): void
+    {
+        $user = $this->makeCoordinator('dedupe-notify@example.com');
+
+        app(WorkflowNotificationService::class)->notifyMany(collect([$user, $user]), [
+            'type' => 'message_created',
+            'title' => 'Dedupe Test',
+            'action_url' => '/projects/1',
+        ]);
+
+        $this->assertSame(1, WorkflowNotification::where('user_id', $user->id)->where('title', 'Dedupe Test')->count());
+    }
+
+    public function test_initial_project_file_upload_creates_notification_for_relevant_recipients(): void
+    {
+        Storage::fake('local');
+
+        $admin = $this->makeAdmin('admin-initial-project-file@example.com');
+        $pm = $this->makePm('pm-initial-project-file@example.com');
+        $file = \Illuminate\Http\UploadedFile::fake()->create('initial-project.pdf', 100);
+
+        $this->actingAs($admin)
+            ->post(route('projects.store'), [
+                'title' => 'Project With Initial File',
+                'status' => 'planned',
+                'file' => $file,
+            ])
+            ->assertRedirect();
+
+        $project = Project::where('title', 'Project With Initial File')->firstOrFail();
+
+        $this->assertDatabaseHas('workflow_notifications', [
+            'user_id' => $pm->id,
+            'type' => 'file_uploaded',
+            'project_id' => $project->id,
+            'title' => 'File Uploaded',
+            'action_url' => '/projects/'.$project->id,
+        ]);
+        $this->assertDatabaseMissing('workflow_notifications', [
+            'user_id' => $admin->id,
+            'type' => 'file_uploaded',
+            'project_id' => $project->id,
+        ]);
+    }
+
+    public function test_initial_task_file_upload_creates_notification_for_relevant_recipients(): void
+    {
+        Storage::fake('local');
+
+        $admin = $this->makeAdmin('admin-initial-task-file@example.com');
+        $coordinator = $this->makeCoordinator('coord-initial-task-file@example.com');
+        $project = Project::factory()->create();
+        $this->assignCoordinator($project, $coordinator, $admin);
+        $file = \Illuminate\Http\UploadedFile::fake()->create('initial-task.pdf', 100);
+
+        $this->actingAs($admin)
+            ->post(route('project.tasks.store', $project), [
+                'title' => 'Task With Initial File',
+                'status' => 'pending',
+                'file' => $file,
+            ])
+            ->assertRedirect();
+
+        $task = Task::where('title', 'Task With Initial File')->firstOrFail();
+
+        $this->assertDatabaseHas('workflow_notifications', [
+            'user_id' => $coordinator->id,
+            'type' => 'file_uploaded',
+            'project_id' => $project->id,
+            'task_id' => $task->id,
+            'title' => 'File Uploaded',
+            'action_url' => '/tasks/'.$task->id,
+        ]);
+        $this->assertDatabaseMissing('workflow_notifications', [
+            'user_id' => $admin->id,
+            'type' => 'file_uploaded',
+            'task_id' => $task->id,
+        ]);
+    }
+
+    public function test_project_coordinator_reassignment_notifies_new_and_old_coordinators(): void
+    {
+        $admin = $this->makeAdmin('admin-reassign@example.com');
+        $oldCoordinator = $this->makeCoordinator('old-reassign@example.com');
+        $newCoordinator = $this->makeCoordinator('new-reassign@example.com');
+        $project = Project::factory()->create();
+        $this->assignCoordinator($project, $oldCoordinator, $admin);
+
+        $this->actingAs($admin)
+            ->post(route('projects.assign-coordinator.update', $project), ['coordinator_id' => $newCoordinator->id])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('workflow_notifications', [
+            'user_id' => $newCoordinator->id,
+            'type' => 'coordinator_assigned',
+            'project_id' => $project->id,
+        ]);
+        $this->assertDatabaseHas('workflow_notifications', [
+            'user_id' => $oldCoordinator->id,
+            'type' => 'coordinator_revoked',
+            'project_id' => $project->id,
+        ]);
+    }
+
+    public function test_project_coordinator_reassignment_does_not_notify_when_same_coordinator_selected(): void
+    {
+        $admin = $this->makeAdmin('admin-same-reassign@example.com');
+        $coordinator = $this->makeCoordinator('same-reassign@example.com');
+        $project = Project::factory()->create();
+        $this->assignCoordinator($project, $coordinator, $admin);
+
+        $this->actingAs($admin)
+            ->post(route('projects.assign-coordinator.update', $project), ['coordinator_id' => $coordinator->id])
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('workflow_notifications', [
+            'user_id' => $coordinator->id,
+            'type' => 'coordinator_revoked',
+            'project_id' => $project->id,
+        ]);
+    }
+
+    public function test_subordinate_assignment_does_not_duplicate_active_assignment_notification(): void
+    {
+        $coordinator = $this->makeCoordinator('coord-sub-dedupe@example.com');
+        $subordinate = $this->makeSubordinate('sub-dedupe@example.com');
+        $subtask = Subtask::factory()->forTask()->create();
+        $this->assignCoordinator($subtask->project, $coordinator, $this->makeAdmin());
+
+        $this->actingAs($coordinator)
+            ->post(route('subtasks.assign-subordinate.store', $subtask), ['subordinate_id' => $subordinate->id])
+            ->assertRedirect();
+        $this->actingAs($coordinator)
+            ->post(route('subtasks.assign-subordinate.store', $subtask), ['subordinate_id' => $subordinate->id])
+            ->assertRedirect();
+
+        $this->assertSame(1, WorkflowNotification::where('user_id', $subordinate->id)
+            ->where('type', 'subordinate_assigned')
+            ->where('subtask_id', $subtask->id)
+            ->count());
+    }
     // Helper methods
 
     protected function assignCoordinator(Project $project, User $coordinator, User $assigner): ProjectAssignment
@@ -610,6 +804,14 @@ class WorkflowNotificationTest extends TestCase
         return $user;
     }
 
+    protected function makePm(?string $email = null): User
+    {
+        $user = User::factory()->create(['email' => $email ?? fake()->unique()->safeEmail()]);
+        $user->syncRoles(['PM/Manager']);
+
+        return $user;
+    }
+
     protected function makeCoordinator(?string $email = null): User
     {
         $user = User::factory()->create(['email' => $email ?? fake()->unique()->safeEmail()]);
@@ -626,4 +828,6 @@ class WorkflowNotificationTest extends TestCase
         return $user;
     }
 }
+
+
 

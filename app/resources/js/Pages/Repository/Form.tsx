@@ -3,7 +3,9 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { BaseUser, Department, RepositoryEntry } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 
-export default function Form({ entry, departments = [], responsibleUsers = [], statuses = [], pageTitle, submitLabel, method, action }: { entry: RepositoryEntry; departments: Department[]; responsibleUsers: BaseUser[]; statuses: string[]; pageTitle: string; submitLabel: string; method: 'post' | 'patch'; action: string }) {
+type RepositoryStatusOption = { value: string; label: string };
+
+export default function Form({ entry, departments = [], responsibleUsers = [], statuses = [], pageTitle, submitLabel, method, action }: { entry: RepositoryEntry; departments: Department[]; responsibleUsers: BaseUser[]; statuses: RepositoryStatusOption[]; pageTitle: string; submitLabel: string; method: 'post' | 'patch'; action: string }) {
     const { data, setData, post, patch, processing, errors } = useForm({
         title: entry.title || '',
         type: entry.type || '',
@@ -44,7 +46,7 @@ export default function Form({ entry, departments = [], responsibleUsers = [], s
                     </div>
                     <div className="grid gap-4 md:grid-cols-3">
                         <div><label className="text-sm font-semibold">Responsible Person</label><select value={data.responsible_user_id} onChange={(event) => setData('responsible_user_id', event.target.value)} className="mt-1 w-full rounded-lg border-gray-300 shadow-sm"><option value="">Select user</option>{responsibleUsers.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select></div>
-                        <div><label className="text-sm font-semibold">Status</label><select value={data.status} onChange={(event) => setData('status', event.target.value)} className="mt-1 w-full rounded-lg border-gray-300 shadow-sm">{statuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></div>
+                        <div><label className="text-sm font-semibold">Status</label><select value={data.status} onChange={(event) => setData('status', event.target.value)} className="mt-1 w-full rounded-lg border-gray-300 shadow-sm">{statuses.filter((status) => status.value).map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select></div>
                         <div><label className="text-sm font-semibold">Deadline</label><input type="date" value={data.deadline} onChange={(event) => setData('deadline', event.target.value)} className="mt-1 w-full rounded-lg border-gray-300 shadow-sm" /></div>
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
@@ -57,3 +59,4 @@ export default function Form({ entry, departments = [], responsibleUsers = [], s
         </AuthenticatedLayout>
     );
 }
+
