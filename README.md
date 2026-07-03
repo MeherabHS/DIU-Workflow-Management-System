@@ -1,6 +1,6 @@
-# DIUS Management Portal
+# DIUs Internal Management Portal
 
-A comprehensive Laravel + Inertia React project management system designed for DIUS (Department of Industrial and Urban Studies) workflow tracking, task management, and institutional repository preservation.
+A comprehensive Laravel + Inertia React project management system designed for Registry Office,DIU (Daffodil International University) workflow tracking, task management, and institutional repository preservation.
 
 ---
 
