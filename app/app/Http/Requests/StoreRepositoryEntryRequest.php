@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Support\ProjectStatus;
+use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreRepositoryEntryRequest extends FormRequest
@@ -19,7 +21,7 @@ class StoreRepositoryEntryRequest extends FormRequest
             'department_id' => ['nullable', 'exists:departments,id'],
             'client_or_office' => ['nullable', 'string', 'max:255'],
             'responsible_user_id' => ['nullable', 'exists:users,id'],
-            'status' => ['required', 'string', 'in:planned,ongoing,submitted,completed,archived,cancelled'],
+            'status' => ['required', 'string', Rule::in(ProjectStatus::repositoryStatuses())],
             'deadline' => ['nullable', 'date'],
             'value_amount' => ['nullable', 'numeric', 'min:0'],
             'value_currency' => ['nullable', 'string', 'max:10'],

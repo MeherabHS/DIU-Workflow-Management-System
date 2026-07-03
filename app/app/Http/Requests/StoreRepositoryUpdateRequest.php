@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Support\ProjectStatus;
+use Illuminate\Validation\Rule;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreRepositoryUpdateRequest extends FormRequest
@@ -15,7 +17,7 @@ class StoreRepositoryUpdateRequest extends FormRequest
     {
         return [
             'update_type' => ['nullable', 'string', 'max:100'],
-            'new_status' => ['nullable', 'string', 'in:planned,ongoing,submitted,completed,archived,cancelled'],
+            'new_status' => ['nullable', 'string', Rule::in(ProjectStatus::repositoryStatuses())],
             'note' => ['required', 'string'],
         ];
     }

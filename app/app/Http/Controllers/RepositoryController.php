@@ -11,9 +11,11 @@ use App\Models\Department;
 use App\Models\RepositoryEntry;
 use App\Models\RepositoryUpdate;
 use App\Models\User;
+use App\Support\ProjectStatus;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -27,7 +29,7 @@ class RepositoryController extends Controller
         // Validate search/filter inputs
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
-            'status' => ['nullable', 'in:planned,ongoing,submitted,completed,archived,cancelled'],
+            'status' => ['nullable', Rule::in(ProjectStatus::repositoryStatuses())],
             'type' => ['nullable', 'string', 'max:100'],
         ]);
 
@@ -234,22 +236,14 @@ class RepositoryController extends Controller
 
     protected function statuses(): array
     {
-        $raw = ['planned', 'ongoing', 'submitted', 'completed', 'archived', 'cancelled'];
-        $labels = [
-            'planned' => 'Planned',
-            'ongoing' => 'Ongoing',
-            'submitted' => 'Submitted',
-            'completed' => 'Completed',
-            'archived' => 'Archived',
-            'cancelled' => 'Cancelled',
-        ];
-
         return array_merge(
             [['value' => '', 'label' => 'All Status']],
-            array_map(fn ($v) => ['value' => $v, 'label' => $labels[$v] ?? ucfirst($v)], $raw)
+            array_map(
+                fn ($status) => ['value' => $status, 'label' => ProjectStatus::label($status)],
+                ProjectStatus::repositoryStatuses()
+            )
         );
-    }
-}
+    }}
 
 
 

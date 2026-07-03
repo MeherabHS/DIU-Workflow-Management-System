@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\ProjectStatus;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -21,7 +22,7 @@ class StoreProjectRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
-            'status' => ['required', 'string', Rule::in(['planned', 'in_progress', 'submitted', 'completed', 'archived', 'cancelled'])],
+            'status' => ['required', 'string', Rule::in(ProjectStatus::canonical())],
             'priority' => ['nullable', 'string', 'max:50'],
             'start_date' => ['nullable', 'date'],
             'deadline' => ['nullable', 'date', 'after_or_equal:start_date'],

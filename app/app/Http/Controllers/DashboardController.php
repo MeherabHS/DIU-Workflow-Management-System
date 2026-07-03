@@ -6,6 +6,7 @@ use App\Helpers\CacheHelper;
 use App\Models\Department;
 use App\Models\Project;
 use App\Models\Subtask;
+use App\Support\ProjectStatus;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -115,11 +116,11 @@ class DashboardController extends Controller
     protected function computeDashboardData(?Collection $scopedProjectIds): array
     {
         $now = now()->toDateString();
-        $doneStatuses = ['completed', 'archived', 'cancelled'];
+        $doneStatuses = ProjectStatus::closedStatuses();
 
         // KPI: In Progress - projects with status in_progress or submitted
         $inProgress = Project::query()
-            ->whereIn('status', ['in_progress', 'submitted'])
+            ->whereIn('status', ProjectStatus::dashboardInProgressStatuses())
             ->when($scopedProjectIds, fn ($q) => $q->whereIn('id', $scopedProjectIds))
             ->count();
 
@@ -147,7 +148,7 @@ class DashboardController extends Controller
 
         // KPI: Total Projects - project-tracking count for active workflow projects
         $totalTasks = Project::query()
-            ->whereIn('status', ['in_progress', 'submitted', 'completed'])
+            ->whereIn('status', ProjectStatus::totalProjectKpiStatuses())
             ->when($scopedProjectIds, fn ($q) => $q->whereIn('id', $scopedProjectIds))
             ->count();
 
@@ -204,7 +205,7 @@ class DashboardController extends Controller
 
         // Status donut: completed vs in-progress project counts
         $inProgressProjects = Project::query()
-            ->whereIn('status', ['in_progress', 'submitted', 'active'])
+            ->whereIn('status', ProjectStatus::dashboardDonutInProgressStatuses())
             ->when($scopedProjectIds, fn ($q) => $q->whereIn('id', $scopedProjectIds))
             ->count();
 

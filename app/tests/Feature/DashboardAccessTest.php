@@ -175,7 +175,7 @@ class DashboardAccessTest extends TestCase
                 ->where('statusData.0.value', 1)
                 ->where('statusData.1.name', 'In Progress')
                 ->where('statusData.1.value', 3)
-                ->where('kpis.4.label', 'Total Tasks')
+                ->where('kpis.4.label', 'Total Projects')
                 ->where('kpis.4.value', 3)
                 ->where('statusData', fn ($statusData) => ! collect($statusData)->contains('name', 'Active')));
     }
@@ -197,7 +197,7 @@ class DashboardAccessTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Dashboards/PM')
-                ->where('kpis.4.label', 'Total Tasks')
+                ->where('kpis.4.label', 'Total Projects')
                 ->where('kpis.4.value', 2));
     }
 

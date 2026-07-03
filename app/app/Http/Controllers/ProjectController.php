@@ -18,11 +18,13 @@ use App\Models\WorkflowComparisonResult;
 use App\Models\WorkflowFile;
 use App\Services\AuditLogService;
 use App\Services\WorkflowNotificationService;
+use App\Support\ProjectStatus;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -40,7 +42,7 @@ class ProjectController extends Controller
         // Validate search/filter inputs
         $validated = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
-            'status' => ['nullable', 'in:planned,in_progress,submitted,completed,archived,cancelled'],
+            'status' => ['nullable', Rule::in(ProjectStatus::canonical())],
         ]);
 
         $query = Project::query()
@@ -448,15 +450,12 @@ class ProjectController extends Controller
 
     protected function statuses(): array
     {
-        return ['planned', 'in_progress', 'submitted', 'completed', 'archived', 'cancelled'];
+        return ProjectStatus::canonical();
     }
 
     protected function mapProjectToRepositoryStatus(string $projectStatus): string
     {
-        return match ($projectStatus) {
-            'in_progress' => 'ongoing',
-            default => $projectStatus,
-        };
+        return ProjectStatus::repositoryStatusForProjectStatus($projectStatus);
     }
     protected function storeInitialProjectFile(Request $request, Project $project, mixed $uploadedFile): void
     {

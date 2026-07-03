@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Project;
 use App\Models\RepositoryEntry;
+use App\Support\ProjectStatus;
 use Illuminate\Console\Command;
 
 class BackfillRepositoryEntries extends Command
@@ -27,10 +28,7 @@ class BackfillRepositoryEntries extends Command
                     continue;
                 }
 
-                $repositoryStatus = match ($project->status ?? 'planned') {
-                    'in_progress' => 'ongoing',
-                    default => $project->status ?? 'planned',
-                };
+                $repositoryStatus = ProjectStatus::repositoryStatusForProjectStatus($project->status ?? 'planned');
 
                 RepositoryEntry::create([
                     'project_id' => $project->id,

@@ -10,6 +10,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\WorkflowNotification;
 use App\Services\WorkflowNotificationService;
+use App\Support\ProjectStatus;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -50,7 +51,7 @@ class GenerateDeadlineNotifications extends Command
             ->whereNotNull('deadline')
             ->where('deadline', '>=', $now->toDateString())
             ->where('deadline', '<=', $tomorrow->toDateString())
-            ->whereNotIn('status', ['completed', 'cancelled', 'archived'])
+            ->whereNotIn('status', ProjectStatus::closedStatuses())
             ->each(function (Project $project) use ($notificationService): void {
                 $recipients = $this->resolveProjectRecipients($project);
                 $this->notifyManyWithoutDuplicates(
@@ -70,7 +71,7 @@ class GenerateDeadlineNotifications extends Command
         Project::query()
             ->whereNotNull('deadline')
             ->where('deadline', '<', $now->toDateString())
-            ->whereNotIn('status', ['completed', 'cancelled', 'archived'])
+            ->whereNotIn('status', ProjectStatus::closedStatuses())
             ->each(function (Project $project) use ($notificationService): void {
                 $recipients = $this->resolveProjectRecipients($project);
                 $this->notifyManyWithoutDuplicates(

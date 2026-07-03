@@ -6,6 +6,7 @@ use App\Helpers\CacheHelper;
 use App\Models\Project;
 use App\Models\RepositoryEntry;
 use App\Models\User;
+use App\Support\ProjectStatus;
 
 class ProjectObserver
 {
@@ -15,10 +16,7 @@ class ProjectObserver
             return;
         }
 
-        $repositoryStatus = match ($project->status) {
-            'in_progress' => 'ongoing',
-            default => $project->status,
-        };
+        $repositoryStatus = ProjectStatus::repositoryStatusForProjectStatus($project->status);
 
         RepositoryEntry::where('project_id', $project->id)
             ->whereNull('finalized_at')
