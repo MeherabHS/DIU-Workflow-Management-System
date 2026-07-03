@@ -1,155 +1,282 @@
-# DIUS Project, Communication & Repository Management Portal
+# DIUS Workflow Management Portal
 
-DIUS Management Portal is a Laravel + Inertia React MVP for managing the Project -> Task -> Work Item workflow, role-based dashboards, repository records, communications, notifications, and evidence uploads.
+A production-oriented Laravel and Inertia React workflow management portal built for role-based project delivery, internal communication, file evidence, repository preservation, auditability, and deployment readiness.
 
-## Current MVP Scope
+The application models an organizational workflow where Admins and PMs create projects, Coordinators manage execution, and Subordinates complete assigned Work Items with messages, progress updates, and evidence uploads.
 
-- Role-based access for Admin, PM/Manager, Coordinator, and Subordinate users.
-- Left sidebar navigation generated from Laravel permissions and roles.
-- Role dashboards for Admin, PM/Manager, Coordinator, and Subordinate users.
+## Portfolio Summary
+
+This project is a full-stack management system built around a real workflow domain rather than a static CRUD demo. It includes authentication, role boundaries, dashboards, repository preservation, private file storage, notifications, audit logs, reports, operational health checks, rate limiting, and a production Docker runtime using Nginx and PHP-FPM.
+
+The project demonstrates practical backend engineering, frontend integration, deployment hardening, and production-readiness decisions.
+
+## Core Capabilities
+
+- Role-based dashboards for Admin, PM/Manager, Coordinator, and Subordinate users.
 - Project -> Task -> Work Item hierarchy.
 - Coordinator assignment at project level.
 - Subordinate assignment at Work Item level.
 - My Work Items workspace for Subordinates.
-- Repository Tracker for preserved project records and timeline updates.
-- Workflow messages, notifications, attachments, and evidence uploads.
-- Profile photo upload with initials fallback.
-- Graceful frontend loading and error fallback screens for slow starts or runtime errors.
+- Workflow messages for project, task, and Work Item communication.
+- Private workflow file upload and authorized download routes.
+- Repository Tracker that preserves project records and timeline updates.
+- Notifications for assignments, messages, file uploads, deadline alerts, and workflow events.
+- Reports and CSV export for project progress, task status, coordinator performance, subordinate completion, repository preservation, and audit activity.
+- User management with roles, active/pending status, department, designation, phone, and profile photos.
+- Audit logs for user and workflow activity.
+- Health endpoint for uptime monitoring.
+- Rate limiting for login, registration, password reset, file upload, profile photo upload, messages, notifications, AI comparison, and report export.
+- Nginx + PHP-FPM Docker runtime suitable for Render, DigitalOcean App Platform, or Docker-based hosts.
 
-## Frontend Architecture
+## Architecture
 
-The frontend is a Laravel Inertia React frontend. It is not a standalone Next.js app and it is not a separate SPA server.
-
-Current frontend stack:
-
-- React 18
-- TypeScript
-- Inertia.js React
-- Tailwind CSS
-- Vite
-- lucide-react
-- class-variance-authority
-- framer-motion
-- tw-animate-css
-
-Laravel owns routing, authentication, authorization, validation, database writes, redirects, and permissions. React owns page rendering, component composition, forms, and client-side UI behavior.
-
-## Runtime Flow
-
-1. The browser requests a normal Laravel route, for example `/projects`.
-2. `routes/web.php` sends the request to a Laravel controller.
-3. The controller checks permissions/policies and loads Eloquent data.
-4. The controller returns `Inertia::render('Projects/Index', [...props])`.
-5. Inertia loads the matching page from `resources/js/Pages`.
-6. React renders the page using props provided by Laravel.
-7. Forms submit to Laravel routes through Inertia `useForm`.
-8. Laravel validates, writes to the database, and redirects back to an Inertia page.
-
-The backend remains the source of truth.
-
-## Navigation And Roles
-
-The authenticated layout uses a left sidebar plus a compact top account bar. Navigation links are shared from `app/Http/Middleware/HandleInertiaRequests.php` and are filtered by role and permission.
-
-Expected role flow:
-
-- Admin: oversight, users, audit trail, reports, projects, repository.
-- PM/Manager: project management, coordinator assignment, reports/repository when permitted.
-- Coordinator: assigned projects, tasks, Work Items, subordinate assignment.
-- Subordinate: My Work Items, progress updates, evidence uploads.
-
-## Status And Terminology
-
-Project statuses shown to users are:
-
-- Planned
-- In Progress
-- Submitted
-- Completed
-- Archived
-- Cancelled
-
-Client-facing UI should say Work Item instead of Subtask. Internal model, table, and route names still use `Subtask`/`subtasks` for compatibility and should not be renamed casually.
-
-The dashboard project-count KPI is labeled Total Projects.
-
-## Key Files And Directories
-
-- `resources/views/app.blade.php`
-  - Inertia root shell and pre-React loading fallback.
-
-- `resources/js/app.tsx`
-  - Boots the Inertia React app, configures navigation progress, and wraps the app in an error boundary.
-
-- `resources/js/Layouts/AuthenticatedLayout.tsx`
-  - Main authenticated shell around the left sidebar and top account bar.
-
-- `resources/js/Components/Dius/ui.tsx`
-  - Shared DIUS UI primitives.
-
-- `resources/js/Components/WorkManagement/*`
-  - Workflow-specific cards, badges, file/message/notification UI, loading fallback, and error boundary.
-
-- `resources/js/lib/utils.ts`
-  - Shared frontend helpers such as `cn`, `humanize`, date formatting, and initials.
-
-- `resources/js/types/index.d.ts`
-  - Shared TypeScript types for Laravel/Inertia props.
-
-## Page Structure
-
-React pages map directly to Laravel controller actions:
-
-- `resources/js/Pages/Dashboard.tsx`
-- `resources/js/Pages/Dashboards/*`
-- `resources/js/Pages/Projects/*`
-- `resources/js/Pages/Tasks/*`
-- `resources/js/Pages/Subtasks/*` for Work Item screens
-- `resources/js/Pages/MySubtasks/*` for My Work Items screens
-- `resources/js/Pages/Repository/*`
-- `resources/js/Pages/Notifications/*`
-- `resources/js/Pages/Auth/*`
-- `resources/js/Pages/Profile/*`
-
-## Render Deployment Notes
-
-- `start.sh` clears config, runs migrations, syncs role permissions, links public storage, clears optimized caches, and starts Laravel on `${PORT:-8000}`.
-- `php artisan storage:link` is expected so profile photos can be served from `/storage/...`.
-- Workflow files are stored on the local/private disk and downloaded through authorized Laravel routes.
-- Workflow file uploads support up to 100 MB. Configure Render Persistent Disk or S3/R2-compatible object storage for production persistence; local container storage may be lost on redeploy without persistent storage.
-- Profile photos use the public disk and remain limited to 2 MB. On free prototype services, persistent storage may reset across redeploys unless a persistent disk is configured.
-- Docker PHP upload limits are set above the app-level 100 MB workflow file validation limit so Laravel can return clear validation errors.
-- Use production-safe environment values for handover, especially `APP_DEBUG=false`, a real `APP_URL`, and database credentials managed by the host.
-
-## Future Development Rules
-
-- Add or modify UI in React/Inertia pages and components, not Blade feature views.
-- Keep `resources/views/app.blade.php` as the Inertia root shell.
-- Do not reintroduce Blade pages for project, task, Work Item, repository, dashboard, auth, or profile UI.
-- Keep Laravel controllers, policies, form requests, and models as the backend source of truth.
-- For new backend data, expose it through controller Inertia props or existing Laravel routes, then render it in React.
-- Do not rename `Subtask` models/tables/routes unless a dedicated compatibility migration plan exists.
-
-## Verification Commands
-
-Use the configured PHP path when running backend tests:
-
-```powershell
-& "G:\Tools\php\php.exe" artisan optimize:clear
-& "G:\Tools\php\php.exe" artisan test
+```text
+Browser
+  |
+  | HTTP
+  v
+Nginx
+  |-- serves static assets from /public/build
+  |-- routes PHP requests to PHP-FPM
+  v
+PHP-FPM
+  v
+Laravel
+  |-- routes/web.php
+  |-- controllers, policies, form requests
+  |-- services for files, reports, notifications, audit logs, AI comparison
+  v
+Database + Storage
+  |-- MySQL or PostgreSQL-compatible database
+  |-- private workflow files in storage/app/private workflow paths
+  |-- public profile photos through Laravel public storage link
 ```
 
-Frontend build:
+## Application Workflow
+
+```text
+Admin / PM
+  |
+  | creates project
+  v
+Project
+  |
+  | assigns Coordinator
+  v
+Coordinator
+  |
+  | creates tasks and Work Items
+  v
+Task
+  |
+  | contains
+  v
+Work Item
+  |
+  | assigned to Subordinate
+  v
+Subordinate
+  |
+  | updates progress, uploads evidence, sends messages
+  v
+Repository + Reports + Audit Trail
+```
+
+## Role Model
+
+| Role | Main Access |
+| --- | --- |
+| Admin | Full oversight, users, audit trail, reports, projects, repository |
+| PM/Manager | Project management, coordinator assignment, reports, repository |
+| Coordinator | Assigned projects, tasks, Work Items, subordinate assignment |
+| Subordinate | My Work Items, progress updates, evidence upload, messages |
+
+The frontend uses client-facing terminology `Work Item`. The backend still uses `Subtask` model, table, and route names for compatibility.
+
+## Technology Stack
+
+| Layer | Technology |
+| --- | --- |
+| Backend | PHP 8.4 runtime, Laravel 13.x, Laravel Breeze, Inertia Laravel |
+| Frontend | React 18, TypeScript, Inertia React, Vite, Tailwind CSS |
+| Authorization | Spatie Laravel Permission plus Laravel policies |
+| Database | MySQL by default, PostgreSQL driver installed in Docker |
+| Files | Laravel local/private disk for workflow files, public disk for profile photos |
+| Runtime | Docker, Nginx, PHP-FPM, Supervisor |
+| Observability | Laravel daily logs, stderr logs, `/health` endpoint |
+| Testing | PHPUnit feature/unit tests, TypeScript build check |
+
+## Data Model Overview
+
+```text
+users
+  |-- roles and permissions through Spatie tables
+  |-- projects.created_by
+  |-- project_assignments.coordinator_id
+  |-- subtask_assignments.subordinate_id
+  |-- workflow_files.uploaded_by
+  |-- workflow_notifications.user_id
+
+projects
+  |-- tasks
+  |-- subtasks / Work Items
+  |-- repository_entries
+  |-- workflow_messages
+  |-- workflow_files
+  |-- workflow_audit_logs
+
+tasks
+  |-- subtasks / Work Items
+  |-- workflow_messages
+  |-- workflow_files
+
+subtasks
+  |-- subtask_assignments
+  |-- workflow_messages
+  |-- workflow_files
+
+repository_entries
+  |-- repository_updates
+  |-- workflow_files
+```
+
+## Production Runtime
+
+The Docker runtime no longer uses `php artisan serve`. Production traffic flows through Nginx and PHP-FPM:
+
+```text
+Nginx : ${PORT:-8080}
+  -> /app/public
+  -> FastCGI 127.0.0.1:9000
+  -> PHP-FPM
+```
+
+Important runtime files:
+
+- `Dockerfile`
+- `start.sh`
+- `docker/nginx/default.conf.template`
+- `docker/supervisor/supervisord.conf`
+- `docker/php/uploads.ini`
+
+Workflow uploads support 100 MB at Laravel validation level. PHP and Nginx limits are higher so Laravel can return controlled validation responses.
+
+## Health And Monitoring
+
+The public health endpoint is:
+
+```text
+GET /health
+```
+
+It checks:
+
+- Laravel app boot
+- database connectivity through a lightweight `select 1`
+- required storage directories are readable and writable
+
+Healthy response:
+
+```json
+{
+  "status": "ok",
+  "app": "DIUS Workflow Management Portal",
+  "environment": "production",
+  "checks": {
+    "database": "ok",
+    "storage": "ok"
+  }
+}
+```
+
+Use an external uptime monitor such as UptimeRobot, Better Stack, Healthchecks, or a cloud monitor to call `/health` every 1 to 5 minutes.
+
+## What Has Been Done
+
+- Built Laravel + Inertia React application shell.
+- Implemented role-specific dashboards and permission-aware navigation.
+- Implemented Project -> Task -> Work Item workflow.
+- Added coordinator and subordinate assignment flows.
+- Added private workflow file upload/download with authorization.
+- Added repository preservation workflow and status synchronization.
+- Added notifications, message threads, deadline reminders, and relative action URLs.
+- Added report pages and CSV exports.
+- Added profile photo upload with initials fallback.
+- Added frontend loading screen and React error boundary.
+- Added centralized project status helper.
+- Added centralized workflow file service.
+- Added rate limiting for security and stability.
+- Added `/health`, daily/stderr logging, and operational failure logs.
+- Replaced production `php artisan serve` with Nginx + PHP-FPM + Supervisor.
+- Added broad feature tests for workflow, security, notifications, repository, files, reports, rate limits, and health checks.
+
+## What I Learned
+
+- How to structure a Laravel + Inertia application where Laravel remains the source of truth and React handles presentation.
+- How to enforce business boundaries with policies, roles, permissions, middleware, and route-level checks.
+- How to separate user audit logs from operational application logs.
+- How to design private file storage so sensitive workflow files are downloaded only through authorized controller routes.
+- How to protect production upload flows with Laravel validation, PHP upload limits, and Nginx body-size limits.
+- How to harden authentication and high-cost endpoints with practical rate limits.
+- How to add health checks and deployment logs so failures can be detected before users report them.
+- Why production Laravel deployments should use Nginx + PHP-FPM instead of `php artisan serve`.
+- How to preserve legacy internal names while presenting cleaner business terminology in the UI.
+- How to keep refactors safe by writing focused tests before and after changes.
+
+## Local Setup Skeleton
+
+See [documentation.md](documentation.md) for the full setup guide. The short version is:
+
+```powershell
+composer install
+npm install
+copy .env.example .env
+php artisan key:generate
+php artisan migrate --force
+php artisan db:seed --class=RolePermissionSeeder --force
+php artisan storage:link
+npm run build
+php artisan serve
+```
+
+Default seeded users use password `password`:
+
+| Email | Role |
+| --- | --- |
+| `admin@example.com` | Admin |
+| `pm@example.com` | PM/Manager |
+| `coordinator@example.com` | Coordinator |
+| `subordinate@example.com` | Subordinate |
+
+## Docker Deployment Skeleton
+
+```powershell
+docker build -t dius-portal-nginx-fpm .
+docker run --rm -p 8080:8080 --env-file .env dius-portal-nginx-fpm
+```
+
+Then check:
+
+```text
+http://localhost:8080
+http://localhost:8080/login
+http://localhost:8080/health
+```
+
+## Verification
 
 ```powershell
 npm run build
+php artisan optimize:clear
+php artisan test
 ```
 
-Current handover checks should include:
+The latest full suite run passed:
 
-- `npm run build`
-- `php artisan optimize:clear`
-- role boundary/visibility tests
-- workflow notification tests
-- project assignment workflow tests
-- full Laravel test suite before final release
+```text
+369 tests, 2888 assertions
+```
+
+## Documentation
+
+The full technical and operational manual is in [documentation.md](documentation.md). It includes environment setup, database schema, deployment, monitoring, recovery steps, rate limits, upload limits, user roles, and troubleshooting procedures.

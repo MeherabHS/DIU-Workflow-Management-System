@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MySubtaskController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProjectController;
@@ -19,6 +20,8 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
+Route::get('/health', HealthController::class)->name('health');
+
 Route::get('/', function () {
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
@@ -32,26 +35,28 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::get('/notifications', [WorkflowNotificationController::class, 'index'])->name('notifications.index');
-    Route::post('/notifications/{workflowNotification}/read', [WorkflowNotificationController::class, 'markRead'])->name('notifications.read');
+    Route::post('/notifications/{workflowNotification}/read', [WorkflowNotificationController::class, 'markRead'])
+        ->middleware('throttle:notification-action')
+        ->name('notifications.read');
     Route::post('/notifications/read-all', [WorkflowNotificationController::class, 'markAllRead'])
-        ->middleware('throttle:10,1')
+        ->middleware('throttle:notification-action')
         ->name('notifications.read-all');
 
     // Comparison routes (rate-limited to prevent API abuse)
     Route::post('/projects/{project}/comparison/run', [ComparisonController::class, 'run'])
-        ->middleware('throttle:3,1')
+        ->middleware('throttle:ai-comparison')
         ->name('projects.comparison.run');
     Route::get('/projects/{project}/comparison', [ComparisonController::class, 'show'])->name('projects.comparison.show');
     Route::post('/projects/{project}/comparison/clear', [ComparisonController::class, 'clear'])->name('projects.comparison.clear');
 
     Route::post('/tasks/{task}/comparison/run', [ComparisonController::class, 'run'])
-        ->middleware('throttle:3,1')
+        ->middleware('throttle:ai-comparison')
         ->name('tasks.comparison.run');
     Route::get('/tasks/{task}/comparison', [ComparisonController::class, 'show'])->name('tasks.comparison.show');
     Route::post('/tasks/{task}/comparison/clear', [ComparisonController::class, 'clear'])->name('tasks.comparison.clear');
 
     Route::post('/subtasks/{subtask}/comparison/run', [ComparisonController::class, 'run'])
-        ->middleware('throttle:3,1')
+        ->middleware('throttle:ai-comparison')
         ->name('subtasks.comparison.run');
     Route::get('/subtasks/{subtask}/comparison', [ComparisonController::class, 'show'])->name('subtasks.comparison.show');
     Route::post('/subtasks/{subtask}/comparison/clear', [ComparisonController::class, 'clear'])->name('subtasks.comparison.clear');
@@ -116,24 +121,28 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         ->whereNumber('project')
         ->name('projects.files.index');
     Route::post('/projects/{project}/files', [WorkflowFileController::class, 'projectStore'])
+        ->middleware('throttle:workflow-upload')
         ->whereNumber('project')
         ->name('projects.files.store');
     Route::get('/tasks/{task}/files', [WorkflowFileController::class, 'taskIndex'])
         ->whereNumber('task')
         ->name('tasks.files.index');
     Route::post('/tasks/{task}/files', [WorkflowFileController::class, 'taskStore'])
+        ->middleware('throttle:workflow-upload')
         ->whereNumber('task')
         ->name('tasks.files.store');
     Route::get('/subtasks/{subtask}/files', [WorkflowFileController::class, 'subtaskIndex'])
         ->whereNumber('subtask')
         ->name('subtasks.files.index');
     Route::post('/subtasks/{subtask}/files', [WorkflowFileController::class, 'subtaskStore'])
+        ->middleware('throttle:workflow-upload')
         ->whereNumber('subtask')
         ->name('subtasks.files.store');
     Route::get('/repository/{repositoryEntry}/files', [WorkflowFileController::class, 'repositoryIndex'])
         ->whereNumber('repositoryEntry')
         ->name('repository.files.index');
     Route::post('/repository/{repositoryEntry}/files', [WorkflowFileController::class, 'repositoryStore'])
+        ->middleware('throttle:workflow-upload')
         ->whereNumber('repositoryEntry')
         ->name('repository.files.store');
     Route::get('/workflow-files/{workflowFile}/download', [WorkflowFileController::class, 'download'])
@@ -146,18 +155,21 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         ->whereNumber('project')
         ->name('projects.messages.index');
     Route::post('/projects/{project}/messages', [WorkflowMessageController::class, 'projectStore'])
+        ->middleware('throttle:workflow-message')
         ->whereNumber('project')
         ->name('projects.messages.store');
     Route::get('/tasks/{task}/messages', [WorkflowMessageController::class, 'taskIndex'])
         ->whereNumber('task')
         ->name('tasks.messages.index');
     Route::post('/tasks/{task}/messages', [WorkflowMessageController::class, 'taskStore'])
+        ->middleware('throttle:workflow-message')
         ->whereNumber('task')
         ->name('tasks.messages.store');
     Route::get('/subtasks/{subtask}/messages', [WorkflowMessageController::class, 'subtaskIndex'])
         ->whereNumber('subtask')
         ->name('subtasks.messages.index');
     Route::post('/subtasks/{subtask}/messages', [WorkflowMessageController::class, 'subtaskStore'])
+        ->middleware('throttle:workflow-message')
         ->whereNumber('subtask')
         ->name('subtasks.messages.store');
     Route::get('/repository', [RepositoryController::class, 'index'])->name('repository.index');
@@ -170,7 +182,9 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::post('/profile/photo', [ProfileController::class, 'updatePhoto'])->name('profile.photo.update');
+    Route::post('/profile/photo', [ProfileController::class, 'updatePhoto'])
+        ->middleware('throttle:profile-photo')
+        ->name('profile.photo.update');
     Route::delete('/profile/photo', [ProfileController::class, 'removePhoto'])->name('profile.photo.remove');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
@@ -184,7 +198,9 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::patch('/{user}', [UserController::class, 'update'])->name('update');
         Route::post('/{user}/toggle-active', [UserController::class, 'toggleActive'])->name('toggle-active');
         Route::post('/{user}/reset-password', [UserController::class, 'resetPassword'])->name('reset-password');
-        Route::post('/{user}/photo', [UserController::class, 'updatePhoto'])->name('photo.update');
+        Route::post('/{user}/photo', [UserController::class, 'updatePhoto'])
+            ->middleware('throttle:profile-photo')
+            ->name('photo.update');
         Route::delete('/{user}/photo', [UserController::class, 'removePhoto'])->name('photo.remove');
     });
 
@@ -192,7 +208,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('/admin/audit-logs', [AuditLogController::class, 'index'])->name('admin.audit-logs.index')->middleware('permission:view audit trail');
 
     // Reports (Admin + PM only)
-    Route::prefix('reports')->name('reports.')->middleware('permission:view reports')->group(function (): void {
+    Route::prefix('reports')->name('reports.')->middleware(['permission:view reports', 'throttle:report-export'])->group(function (): void {
         Route::get('/', [ReportsController::class, 'index'])->name('index');
         Route::get('/project-progress', [ReportsController::class, 'projectProgress'])->name('project-progress');
         Route::get('/task-status', [ReportsController::class, 'taskStatus'])->name('task-status');
@@ -204,5 +220,3 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 });
 
 require __DIR__.'/auth.php';
-
-

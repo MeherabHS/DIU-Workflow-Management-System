@@ -12,11 +12,13 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\File;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class UserController extends Controller
 {
@@ -195,13 +197,23 @@ class UserController extends Controller
             'photo' => ['required', File::types(['jpg', 'jpeg', 'png', 'webp'])->max(2048)],
         ]);
 
-        // Delete old photo if exists
-        if ($user->profile_photo_path) {
-            Storage::disk('public')->delete($user->profile_photo_path);
-        }
+        try {
+            // Delete old photo if exists
+            if ($user->profile_photo_path) {
+                Storage::disk('public')->delete($user->profile_photo_path);
+            }
 
-        $path = $request->file('photo')->store('profile-photos', 'public');
-        $user->update(['profile_photo_path' => $path]);
+            $path = $request->file('photo')->store('profile-photos', 'public');
+            $user->update(['profile_photo_path' => $path]);
+        } catch (Throwable $exception) {
+            Log::error('Admin profile photo upload failed.', [
+                'target_user_id' => $user->id,
+                'actor_id' => $request->user()?->id,
+                'exception' => $exception::class,
+            ]);
+
+            throw $exception;
+        }
 
         $this->audit->logUserUpdated($user, ['action' => 'profile_photo_updated']);
 

@@ -12,10 +12,12 @@ use App\Services\WorkflowFileService;
 use App\Services\WorkflowNotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class WorkflowFileController extends Controller
 {
@@ -93,9 +95,27 @@ class WorkflowFileController extends Controller
     {
         $this->authorize('download', $workflowFile);
 
-        abort_unless(Storage::disk($workflowFile->disk)->exists($workflowFile->path), 404);
+        try {
+            if (! Storage::disk($workflowFile->disk)->exists($workflowFile->path)) {
+                Log::warning('Workflow file download failed because the stored file is missing.', [
+                    'workflow_file_id' => $workflowFile->id,
+                    'user_id' => request()->user()?->id,
+                    'disk' => $workflowFile->disk,
+                ]);
 
-        return Storage::disk($workflowFile->disk)->download($workflowFile->path, $workflowFile->original_name);
+                abort(404);
+            }
+
+            return Storage::disk($workflowFile->disk)->download($workflowFile->path, $workflowFile->original_name);
+        } catch (Throwable $exception) {
+            Log::error('Workflow file download failed.', [
+                'workflow_file_id' => $workflowFile->id,
+                'user_id' => request()->user()?->id,
+                'exception' => $exception::class,
+            ]);
+
+            throw $exception;
+        }
     }
 
     public function destroy(WorkflowFile $workflowFile): RedirectResponse
@@ -118,15 +138,26 @@ class WorkflowFileController extends Controller
 
         abort_unless(collect($contextColumns)->filter()->isNotEmpty(), 422);
 
-        $file = $fileService->storeUploadedFile(
-            $validated['file'],
-            $context,
-            $request->user(),
-            $validated['file_category'] ?? $defaultCategory,
-            $validated['description'] ?? null
-        );
+        try {
+            $file = $fileService->storeUploadedFile(
+                $validated['file'],
+                $context,
+                $request->user(),
+                $validated['file_category'] ?? $defaultCategory,
+                $validated['description'] ?? null
+            );
 
-        app(WorkflowNotificationService::class)->notifyFileUploaded($file);
+            app(WorkflowNotificationService::class)->notifyFileUploaded($file);
+        } catch (Throwable $exception) {
+            Log::error('Workflow file upload failed.', [
+                'context_type' => $context::class,
+                'context_id' => $context->getKey(),
+                'user_id' => $request->user()?->id,
+                'exception' => $exception::class,
+            ]);
+
+            throw $exception;
+        }
 
         return redirect()->back()->with('status', 'File uploaded successfully.');
     }

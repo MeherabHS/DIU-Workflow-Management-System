@@ -1,6 +1,11 @@
 #!/usr/bin/env sh
 set -e
 
+export PORT="${PORT:-8080}"
+
+echo "[start.sh] Preparing Nginx on port ${PORT}..."
+envsubst '$PORT' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf
+
 echo "[start.sh] Preparing Laravel runtime..."
 php artisan config:clear || true
 
@@ -16,5 +21,5 @@ php artisan storage:link || true
 echo "[start.sh] Clearing optimized caches..."
 php artisan optimize:clear || true
 
-echo "[start.sh] Starting DIUS Management Portal on port ${PORT:-8000}..."
-php artisan serve --host 0.0.0.0 --port ${PORT:-8000}
+echo "[start.sh] Starting PHP-FPM and Nginx..."
+exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf

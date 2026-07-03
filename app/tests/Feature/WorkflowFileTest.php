@@ -14,6 +14,7 @@ use App\Services\WorkflowFileService;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Spatie\Permission\PermissionRegistrar;
@@ -411,6 +412,8 @@ class WorkflowFileTest extends TestCase
                 ]))
                 ->assertSessionHasNoErrors()
                 ->assertRedirect();
+
+            Cache::flush();
         }
 
         foreach ($files as [$name]) {
