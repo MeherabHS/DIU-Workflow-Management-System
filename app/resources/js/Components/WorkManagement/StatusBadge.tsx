@@ -6,7 +6,6 @@ const variants = cva('inline-flex items-center rounded-full px-2.5 py-0.5 text-x
         tone: {
             planned: 'bg-gray-100 text-gray-800',
             pending: 'bg-gray-100 text-gray-800',
-            active: 'bg-blue-100 text-blue-800',
             in_progress: 'bg-blue-100 text-blue-800',
             ongoing: 'bg-blue-100 text-blue-800',
             submitted: 'bg-yellow-100 text-yellow-800',

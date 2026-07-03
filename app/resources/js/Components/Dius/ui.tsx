@@ -17,7 +17,6 @@ const statusVariants = cva('inline-flex items-center rounded-full px-2.5 py-0.5 
         tone: {
             planned: 'bg-gray-100 text-gray-800',
             pending: 'bg-gray-100 text-gray-800',
-            active: 'bg-blue-100 text-blue-800',
             in_progress: 'bg-blue-100 text-blue-800',
             ongoing: 'bg-blue-100 text-blue-800',
             submitted: 'bg-yellow-100 text-yellow-800',
@@ -26,7 +25,6 @@ const statusVariants = cva('inline-flex items-center rounded-full px-2.5 py-0.5 
             approved: 'bg-green-100 text-green-800',
             revision_required: 'bg-red-100 text-red-800',
             cancelled: 'bg-red-100 text-red-800',
-            archive_pending: 'bg-slate-200 text-slate-800',
             archived: 'bg-slate-200 text-slate-800',
         },
     },

@@ -145,7 +145,7 @@ class DashboardController extends Controller
             ->when($scopedProjectIds, fn ($q) => $q->whereIn('id', $scopedProjectIds))
             ->count();
 
-        // KPI: Total Tasks - project-tracking count for active workflow projects
+        // KPI: Total Projects - project-tracking count for active workflow projects
         $totalTasks = Project::query()
             ->whereIn('status', ['in_progress', 'submitted', 'completed'])
             ->when($scopedProjectIds, fn ($q) => $q->whereIn('id', $scopedProjectIds))
@@ -156,7 +156,7 @@ class DashboardController extends Controller
             ['label' => 'Completed', 'value' => $completed, 'color' => 'green'],
             ['label' => 'Due', 'value' => $due, 'color' => 'amber'],
             ['label' => 'Overdue', 'value' => $overdue, 'color' => 'red'],
-            ['label' => 'Total Tasks', 'value' => $totalTasks, 'color' => 'purple'],
+            ['label' => 'Total Projects', 'value' => $totalTasks, 'color' => 'purple'],
         ];
 
         // Project glance: priority-filtered (urgent/high/medium), sorted by overdue -> priority -> deadline

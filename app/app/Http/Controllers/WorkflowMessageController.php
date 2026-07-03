@@ -63,7 +63,7 @@ class WorkflowMessageController extends Controller
         $this->authorize('viewSubtask', [WorkflowMessage::class, $subtask]);
 
         return Inertia::render('Messages/SubtaskMessages', [
-            'pageTitle' => 'Subtask Feedback / Follow-up',
+            'pageTitle' => 'Work Item Feedback / Follow-up',
             'contextTitle' => $subtask->title,
             ...$this->messageThreadProps($subtask, request()->user()),
         ]);
