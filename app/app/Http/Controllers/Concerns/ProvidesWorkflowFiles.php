@@ -34,6 +34,7 @@ trait ProvidesWorkflowFiles
         return $context->files()
             ->with('uploader')
             ->latest()
+            ->limit(100)
             ->get();
     }
 

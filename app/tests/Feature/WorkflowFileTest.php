@@ -262,6 +262,35 @@ class WorkflowFileTest extends TestCase
             ->where('files.0.can_delete', true));
     }
 
+    public function test_project_file_list_returns_latest_hundred_files(): void
+    {
+        $admin = $this->makeAdmin();
+        $project = Project::factory()->create();
+
+        for ($i = 1; $i <= 105; $i++) {
+            WorkflowFile::create([
+                'project_id' => $project->id,
+                'uploaded_by' => $admin->id,
+                'original_name' => sprintf('proof-%03d.pdf', $i),
+                'stored_name' => sprintf('proof-%03d.pdf', $i),
+                'disk' => 'local',
+                'path' => sprintf('workflow-files/proof-%03d.pdf', $i),
+                'mime_type' => 'application/pdf',
+                'size' => 1024,
+                'file_category' => 'attachment',
+                'created_at' => now()->subMinutes(106 - $i),
+                'updated_at' => now()->subMinutes(106 - $i),
+            ]);
+        }
+
+        $this->actingAs($admin)
+            ->get(route('projects.show', $project))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('files', 100)
+                ->where('files.0.original_name', 'proof-105.pdf')
+                ->where('files.99.original_name', 'proof-006.pdf'));
+    }
     public function test_compact_attachment_components_match_reference_structure(): void
     {
         $fileList = file_get_contents(resource_path('js/Components/WorkManagement/FileList.tsx'));

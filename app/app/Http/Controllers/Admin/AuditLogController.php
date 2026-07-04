@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\Project;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -42,10 +43,18 @@ class AuditLogController extends Controller
             $query->whereDate('created_at', '<=', $dateTo);
         }
 
-        $actions = AuditLog::query()->distinct()->pluck('action')->sort()->values();
-        $entityTypes = AuditLog::query()->whereNotNull('entity_type')->distinct()->pluck('entity_type')->sort()->values();
-        $actors = User::query()->orderBy('name')->get(['id', 'name']);
-        $projects = Project::query()->orderBy('title')->get(['id', 'title']);
+        $actions = Cache::remember('audit_logs:metadata:actions', now()->addMinutes(5), fn () =>
+            AuditLog::query()->distinct()->pluck('action')->sort()->values()
+        );
+        $entityTypes = Cache::remember('audit_logs:metadata:entity_types', now()->addMinutes(5), fn () =>
+            AuditLog::query()->whereNotNull('entity_type')->distinct()->pluck('entity_type')->sort()->values()
+        );
+        $actors = Cache::remember('audit_logs:metadata:actors', now()->addMinutes(5), fn () =>
+            User::query()->orderBy('name')->get(['id', 'name'])
+        );
+        $projects = Cache::remember('audit_logs:metadata:projects', now()->addMinutes(5), fn () =>
+            Project::query()->orderBy('title')->get(['id', 'title'])
+        );
 
         return Inertia::render('Admin/AuditLogs/Index', [
             'pageTitle' => 'Audit Trail',

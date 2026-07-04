@@ -171,7 +171,7 @@ class DashboardController extends Controller
             $projectQuery->whereIn('id', $scopedProjectIds);
         }
 
-        $projects = $projectQuery->orderBy('deadline')->orderBy('created_at', 'desc')->get();
+        $projects = $projectQuery->orderBy('deadline')->orderBy('created_at', 'desc')->limit(100)->get();
 
         $projectStatuses = $projects->map(function ($p) use ($now, $priorityOrder, $doneStatuses) {
             $isOverdue = $p->deadline && $p->deadline->toDateString() < $now && ! in_array($p->status, $doneStatuses, true);
@@ -201,7 +201,7 @@ class DashboardController extends Controller
             }
             // Nearest deadline
             return ($a['deadline'] ?? '9999-12-31') <=> ($b['deadline'] ?? '9999-12-31');
-        })->values()->all();
+        })->take(10)->values()->all();
 
         // Status donut: completed vs in-progress project counts
         $inProgressProjects = Project::query()
@@ -220,8 +220,8 @@ class DashboardController extends Controller
             $month = Carbon::now()->subMonths($i);
             $months[] = [
                 'month' => $month->format('M Y'),
-                'year' => $month->year,
-                'month_num' => $month->month,
+                'start' => $month->copy()->startOfMonth(),
+                'end' => $month->copy()->startOfMonth()->addMonth(),
             ];
         }
 
@@ -229,8 +229,8 @@ class DashboardController extends Controller
         foreach ($months as $m) {
             $count = Subtask::query()
                 ->whereIn('status', ['completed', 'approved'])
-                ->whereYear('updated_at', $m['year'])
-                ->whereMonth('updated_at', $m['month_num']);
+                ->where('updated_at', '>=', $m['start'])
+                ->where('updated_at', '<', $m['end']);
             if ($scopedProjectIds !== null) {
                 $count->whereIn('project_id', $scopedProjectIds);
             }

@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Support\ProjectStatus;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -99,7 +100,9 @@ class RepositoryController extends Controller
             'departments' => Department::query()->where('is_active', true)->orderBy('name')->get(),
             'types' => array_merge(
                 ['not_set'],
-                RepositoryEntry::query()->whereNotNull('type')->where('type', '!=', '')->distinct()->orderBy('type')->pluck('type')->toArray()
+                Cache::remember('repository_entries:metadata:types', now()->addMinutes(5), fn () =>
+                    RepositoryEntry::query()->whereNotNull('type')->where('type', '!=', '')->distinct()->orderBy('type')->pluck('type')->toArray()
+                )
             ),
             'statuses' => $this->statuses(),
             'filters' => $request->only(['search', 'status', 'type', 'department_id', 'deadline_scope']),

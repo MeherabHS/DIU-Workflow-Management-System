@@ -222,5 +222,34 @@ class DashboardAccessTest extends TestCase
         $subordinate->syncRoles(['Subordinate']);
         $this->actingAs($subordinate)->get('/dashboard')->assertRedirect(route('subordinate.dashboard'));
     }
-}
+    public function test_admin_dashboard_priority_project_glance_is_limited_after_existing_sort(): void
+    {
+        $admin = User::factory()->create();
+        $admin->syncRoles(['Admin']);
 
+        Project::factory()->create([
+            'title' => 'Oldest hidden project',
+            'priority' => 'medium',
+            'status' => 'in_progress',
+            'deadline' => now()->addDays(30)->toDateString(),
+            'created_at' => now()->subDays(30),
+        ]);
+
+        for ($i = 1; $i <= 11; $i++) {
+            Project::factory()->create([
+                'title' => sprintf('Priority project %02d', $i),
+                'priority' => $i === 11 ? 'urgent' : 'high',
+                'status' => 'in_progress',
+                'deadline' => now()->addDays($i)->toDateString(),
+                'created_at' => now()->subDays($i),
+            ]);
+        }
+
+        $this->actingAs($admin)
+            ->get('/admin/dashboard')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('projectStatuses', 10)
+                ->where('projectStatuses.0.title', 'Priority project 11'));
+    }
+}

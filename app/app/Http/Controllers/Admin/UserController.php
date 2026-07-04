@@ -29,7 +29,7 @@ class UserController extends Controller
     {
         $this->authorize('viewAny', User::class);
 
-        $query = User::query()->with(['department']);
+        $query = User::query()->with(['department', 'roles']);
 
         if ($search = $request->string('search')->toString()) {
             $search = str_replace(['%', '_'], ['\\%', '\\_'], $search);
@@ -55,7 +55,7 @@ class UserController extends Controller
 
         // Transform roles into simple role name strings for frontend
         $users->through(function ($user) {
-            $user->roles = $user->getRoleNames()->values()->all();
+            $user->roles = $user->roles->pluck('name')->values()->all();
             return $user;
         });
 

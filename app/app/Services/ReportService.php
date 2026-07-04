@@ -114,13 +114,11 @@ class ReportService
         $coordinators = User::role('Coordinator')->select('id', 'name', 'email')->get();
 
         // Single aggregated query for all coordinator metrics
-        $projectIdList = $this->scopedProjectIds ?? Project::pluck('id');
-
         $metrics = DB::table('projects')
             ->join('project_assignments', 'projects.id', '=', 'project_assignments.project_id')
             ->leftJoin('tasks', 'projects.id', '=', 'tasks.project_id')
             ->leftJoin('subtasks', 'projects.id', '=', 'subtasks.project_id')
-            ->whereIn('projects.id', $projectIdList)
+            ->when($this->scopedProjectIds !== null, fn ($query) => $query->whereIn('projects.id', $this->scopedProjectIds))
             ->where('project_assignments.assignment_role', 'primary')
             ->whereNull('project_assignments.revoked_at')
             ->groupBy('project_assignments.coordinator_id')

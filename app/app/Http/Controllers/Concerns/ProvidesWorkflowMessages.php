@@ -23,7 +23,7 @@ trait ProvidesWorkflowMessages
 
         return [
             'messageSectionTitle' => 'Feedback / Follow-up',
-            'messages' => $this->formatWorkflowMessages($this->workflowMessageQuery($context, $user)->get()),
+            'messages' => $this->formatWorkflowMessages($this->workflowMessageQuery($context, $user)->get()->sortBy(fn (WorkflowMessage $message): string => sprintf('%s-%010d', $message->created_at?->format('Y-m-d H:i:s.u') ?? '', $message->id))->values()),
             'canCreateMessage' => $canCreateMessage,
             'messageStoreUrl' => $canCreateMessage ? $storeUrl : null,
             'allowedMessageTypes' => $this->allowedMessageTypes(),
@@ -33,7 +33,11 @@ trait ProvidesWorkflowMessages
 
     protected function workflowMessageQuery(Project|Task|Subtask $context, User $user): Builder
     {
-        $query = WorkflowMessage::query()->with('sender')->oldest();
+        $query = WorkflowMessage::query()
+            ->with(['sender.roles'])
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->limit(100);
 
         if ($context instanceof Project) {
             $query->where('project_id', $context->id)->whereNull('task_id')->whereNull('subtask_id');
@@ -94,7 +98,7 @@ trait ProvidesWorkflowMessages
                 'message_type_label' => $this->messageTypeLabel($message->message_type),
                 'sender_id' => $sender?->id,
                 'sender_name' => $name,
-                'sender_role' => $sender?->getRoleNames()->first() ?? 'User',
+                'sender_role' => $sender?->roles?->pluck('name')->first() ?? 'User',
                 'sender_initials' => $this->initials($name),
                 'created_at' => $message->created_at?->toISOString(),
                 'created_at_human' => $message->created_at?->diffForHumans(),

@@ -242,6 +242,30 @@ class WorkflowMessageTest extends TestCase
             ->where('messages.0.sender_id', $admin->id));
     }
 
+    public function test_project_message_thread_returns_latest_hundred_messages_oldest_first(): void
+    {
+        $admin = $this->makeAdmin();
+        $project = Project::factory()->create();
+
+        for ($i = 1; $i <= 105; $i++) {
+            WorkflowMessage::create([
+                'project_id' => $project->id,
+                'sender_id' => $admin->id,
+                'body' => sprintf('Message %03d', $i),
+                'message_type' => 'message',
+                'created_at' => now()->subMinutes(106 - $i),
+                'updated_at' => now()->subMinutes(106 - $i),
+            ]);
+        }
+
+        $this->actingAs($admin)
+            ->get(route('projects.messages.index', $project))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('messages', 100)
+                ->where('messages.0.body', 'Message 006')
+                ->where('messages.99.body', 'Message 105'));
+    }
     public function test_message_thread_renders_composer_controls_when_authorized_even_with_empty_messages(): void
     {
         $thread = file_get_contents(resource_path('js/Components/WorkManagement/MessageThread.tsx'));
