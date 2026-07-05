@@ -32,9 +32,9 @@ type ComparisonResult = {
     created_at: string | null;
 };
 
-type Props = { task: Task; canCreateSubtask?: boolean; canAssignSubordinate?: boolean; canRevokeSubordinate?: boolean; canUpdateTask?: boolean; messages?: any[]; files?: any[]; canUploadFile?: boolean; fileUploadUrl?: string | null; allowedFileTypes?: string; maxFileSizeMb?: number; fileSectionLabel?: string; canCreateMessage?: boolean; messageStoreUrl?: string | null; allowedMessageTypes?: any[]; defaultMessageType?: string; comparisonResult?: ComparisonResult | null; isComparisonConfigured?: boolean; comparisonRunUrl?: string | null; comparisonClearUrl?: string | null };
+type Props = { task: Task; canCreateSubtask?: boolean; canAssignSubordinate?: boolean; canRevokeSubordinate?: boolean; canUpdateTask?: boolean; messages?: any[]; files?: any[]; canUploadFile?: boolean; fileUploadUrl?: string | null; allowedFileTypes?: string; maxFileSizeMb?: number; fileSectionLabel?: string; fileCategoryOptions?: any[]; defaultFileCategory?: string; fileUploadHelperText?: string; canCreateMessage?: boolean; messageStoreUrl?: string | null; allowedMessageTypes?: any[]; defaultMessageType?: string; comparisonResult?: ComparisonResult | null; isComparisonConfigured?: boolean; comparisonRunUrl?: string | null; comparisonClearUrl?: string | null };
 
-export default function Show({ task, canCreateSubtask = false, canAssignSubordinate = false, canRevokeSubordinate = false, canUpdateTask = false, messages = [], canCreateMessage = false, messageStoreUrl, allowedMessageTypes = [], defaultMessageType = 'message', files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 10, fileSectionLabel = 'Attachments', comparisonResult = null, isComparisonConfigured = false, comparisonRunUrl = null, comparisonClearUrl = null }: Props) {
+export default function Show({ task, canCreateSubtask = false, canAssignSubordinate = false, canRevokeSubordinate = false, canUpdateTask = false, messages = [], canCreateMessage = false, messageStoreUrl, allowedMessageTypes = [], defaultMessageType = 'message', files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 10, fileSectionLabel = 'Attachments', fileCategoryOptions = [], defaultFileCategory, fileUploadHelperText, comparisonResult = null, isComparisonConfigured = false, comparisonRunUrl = null, comparisonClearUrl = null }: Props) {
     const assigned = (task.assigned_user || task.assignedUser) ? [task.assigned_user || task.assignedUser] as BaseUser[] : [];
 
     return (
@@ -43,7 +43,7 @@ export default function Show({ task, canCreateSubtask = false, canAssignSubordin
             <DetailModal title={task.title} description={task.description || 'Task Details'} onCloseHref={task.project ? route('project.tasks.index', task.project.id) : route('dashboard')} actions={<>{canCreateSubtask && <Link href={route('tasks.subtasks.create', task.id)} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-700">Create Work Item</Link>}<a href="#work-items" className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50">View Work Items</a>{canUpdateTask && <Link href={route('tasks.edit', task.id)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50">Edit</Link>}</>}>
                 <SummaryGrid task={task} />
                 <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="text-base font-semibold text-gray-950">Assigned To</h2></div><AssignmentChips users={assigned} /></section>
-                <FileList files={files} canUploadFile={canUploadFile} fileUploadUrl={fileUploadUrl} allowedFileTypes={allowedFileTypes} maxFileSizeMb={maxFileSizeMb} title={fileSectionLabel} />
+                <FileList files={files} canUploadFile={canUploadFile} fileUploadUrl={fileUploadUrl} allowedFileTypes={allowedFileTypes} maxFileSizeMb={maxFileSizeMb} title={fileSectionLabel} fileCategoryOptions={fileCategoryOptions} defaultFileCategory={defaultFileCategory} fileUploadHelperText={fileUploadHelperText} />
                 <RequirementDeliverableComparison isConfigured={isComparisonConfigured} result={comparisonResult} runUrl={comparisonRunUrl || ''} clearUrl={comparisonClearUrl || ''} />
                 <ProgressComparison expected={(task.subtasks || []).map((subtask) => subtask.title)} completed={(task.subtasks || []).filter((subtask) => ['completed', 'approved'].includes(subtask.status || '')).map((subtask) => subtask.title)} />
                 <MessageThread messages={messages} canCreateMessage={canCreateMessage} messageStoreUrl={messageStoreUrl} allowedMessageTypes={allowedMessageTypes} defaultMessageType={defaultMessageType} viewAllHref={route('tasks.messages.index', task.id)} />
@@ -56,5 +56,6 @@ export default function Show({ task, canCreateSubtask = false, canAssignSubordin
         </AuthenticatedLayout>
     );
 }
+
 
 

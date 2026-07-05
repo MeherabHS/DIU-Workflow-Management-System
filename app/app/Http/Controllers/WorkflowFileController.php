@@ -7,6 +7,7 @@ use App\Models\Project;
 use App\Models\RepositoryEntry;
 use App\Models\Subtask;
 use App\Models\Task;
+use App\Models\User;
 use App\Models\WorkflowFile;
 use App\Services\WorkflowFileService;
 use App\Services\WorkflowNotificationService;
@@ -130,9 +131,10 @@ class WorkflowFileController extends Controller
     protected function storeForContext(Request $request, Project|Task|Subtask|RepositoryEntry $context, array $contextColumns, string $defaultCategory): RedirectResponse
     {
         $fileService = app(WorkflowFileService::class);
+        $allowedCategories = $this->allowedFileCategories($request->user(), $context, $defaultCategory);
         $validated = $request->validate([
             ...$fileService->validationRules(),
-            'file_category' => ['nullable', 'string', Rule::in(['attachment', 'requirement', 'deliverable', 'evidence', 'other', 'reference', 'repository_document', 'feedback_attachment'])],
+            'file_category' => ['nullable', 'string', Rule::in($allowedCategories)],
             'description' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -143,11 +145,19 @@ class WorkflowFileController extends Controller
                 $validated['file'],
                 $context,
                 $request->user(),
-                $validated['file_category'] ?? $defaultCategory,
+                $validated['file_category'] ?? $this->defaultFileCategory($request->user(), $context, $defaultCategory),
                 $validated['description'] ?? null
             );
 
-            app(WorkflowNotificationService::class)->notifyFileUploaded($file);
+            try {
+                app(WorkflowNotificationService::class)->notifyFileUploaded($file);
+            } catch (Throwable $notificationException) {
+                Log::warning('Workflow file upload notification failed.', [
+                    'workflow_file_id' => $file->id,
+                    'user_id' => $request->user()?->id,
+                    'exception' => $notificationException::class,
+                ]);
+            }
         } catch (Throwable $exception) {
             Log::error('Workflow file upload failed.', [
                 'context_type' => $context::class,
@@ -160,6 +170,57 @@ class WorkflowFileController extends Controller
         }
 
         return redirect()->back()->with('status', 'File uploaded successfully.');
+    }
+    protected function allowedFileCategories(User $user, Project|Task|Subtask|RepositoryEntry $context, string $defaultCategory): array
+    {
+        if ($context instanceof Project) {
+            if ($user->hasAnyRole(['Admin', 'PM/Manager'])) {
+                return ['requirement', 'attachment', 'other'];
+            }
+
+            if ($user->hasRole('Coordinator')) {
+                return ['follow_up', 'deliverable', 'evidence', 'attachment', 'other'];
+            }
+        }
+
+        if ($context instanceof Subtask) {
+            if ($user->hasRole('Subordinate')) {
+                return ['evidence', 'attachment', 'other'];
+            }
+
+            return ['follow_up', 'deliverable', 'evidence', 'attachment', 'other'];
+        }
+
+        if ($context instanceof RepositoryEntry) {
+            return ['repository_document', 'attachment', 'other'];
+        }
+
+        if ($context instanceof Task) {
+            return ['requirement', 'follow_up', 'deliverable', 'evidence', 'attachment', 'other'];
+        }
+
+        return array_values(array_unique([$defaultCategory, 'attachment', 'other']));
+    }
+
+    protected function defaultFileCategory(User $user, Project|Task|Subtask|RepositoryEntry $context, string $defaultCategory): string
+    {
+        if ($context instanceof Project) {
+            if ($user->hasAnyRole(['Admin', 'PM/Manager'])) {
+                return 'requirement';
+            }
+
+            if ($user->hasRole('Coordinator')) {
+                return 'follow_up';
+            }
+        }
+
+        $allowed = $this->allowedFileCategories($user, $context, $defaultCategory);
+
+        if (in_array($defaultCategory, $allowed, true)) {
+            return $defaultCategory;
+        }
+
+        return $allowed[0] ?? 'attachment';
     }
 
     protected function workflowFileForSubtask(Subtask $subtask): WorkflowFile
@@ -179,5 +240,9 @@ class WorkflowFileController extends Controller
         ]);
     }
 }
+
+
+
+
 
 

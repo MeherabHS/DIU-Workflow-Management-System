@@ -84,7 +84,7 @@ class RequirementDeliverableComparisonTest extends TestCase
                 'completion_percentage' => 0,
                 'items' => [],
             ])
-            ->assertJsonPath('summary', 'No requirement file has been uploaded yet. Upload a file with category Requirement.')
+            ->assertJsonPath('summary', 'Upload a Requirement file first. Usually this is the PM/Admin instruction or project requirement.')
             ->assertJsonPath('expected_items', []);
     }
 
@@ -461,14 +461,27 @@ class RequirementDeliverableComparisonTest extends TestCase
         ]);
         Storage::disk('local')->put($file->path, 'Collect departmental records and prepare repository inventory.');
 
+        $otherFile = WorkflowFile::create([
+            'project_id' => $project->id,
+            'uploaded_by' => $admin->id,
+            'original_name' => 'generic-other.txt',
+            'stored_name' => 'generic-other.txt',
+            'disk' => 'local',
+            'path' => 'workflow-files/2026/07/generic-other.txt',
+            'mime_type' => 'text/plain',
+            'size' => 100,
+            'file_category' => 'other',
+        ]);
+        Storage::disk('local')->put($otherFile->path, 'Generic attachment that must not be treated as deliverable evidence.');
+
         $this->actingAs($admin)
             ->postJson(route('projects.comparison.run', $project))
             ->assertOk()
             ->assertJsonPath('status', 'no_deliverables')
-            ->assertJsonPath('summary', 'Requirement file found, but no deliverable or evidence file has been uploaded yet.');
+            ->assertJsonPath('summary', 'Requirement found. Waiting for Coordinator follow-up, deliverable, or evidence file.');
     }
 
-    public function test_project_comparison_detects_deliverable_category_and_returns_structured_ai_summary(): void
+    public function test_project_comparison_detects_follow_up_category_and_returns_structured_ai_summary(): void
     {
         Config::set('ai_comparison.enabled', true);
         Config::set('ai_comparison.api_key', 'test-key');
@@ -507,7 +520,7 @@ class RequirementDeliverableComparisonTest extends TestCase
 
         foreach ([
             ['chairman-requirement.txt', 'requirement', 'Collect departmental records and prepare repository inventory.'],
-            ['registrar-progress.txt', 'deliverable', 'Some records collected and a draft inventory started.'],
+            ['registrar-progress.txt', 'follow_up', 'Some records collected and a draft inventory started.'],
         ] as [$name, $category, $contents]) {
             $file = WorkflowFile::create([
                 'project_id' => $project->id,
@@ -655,5 +668,7 @@ class RequirementDeliverableComparisonTest extends TestCase
         return $content;
     }
 }
+
+
 
 

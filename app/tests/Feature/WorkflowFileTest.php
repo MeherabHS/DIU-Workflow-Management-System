@@ -554,23 +554,43 @@ class WorkflowFileTest extends TestCase
             ->where('allowedFileTypes', $expected)
             ->where('maxFileSizeMb', 100));
     }
-    public function test_project_file_upload_accepts_ai_comparison_categories(): void
+    public function test_project_file_upload_uses_role_aware_ai_comparison_categories(): void
     {
         $admin = $this->makeAdmin('admin-ai-file-categories@example.com');
-        $project = Project::factory()->create();
+        $coordinator = $this->makeCoordinator('coord-ai-file-categories@example.com');
+        $project = Project::factory()->create(['created_by' => $admin->id]);
+        $this->assignCoordinator($project, $coordinator, $admin);
 
-        foreach (['requirement', 'deliverable', 'evidence', 'other'] as $category) {
+        foreach (['requirement', 'attachment', 'other'] as $category) {
             $this->actingAs($admin)->post(route('projects.files.store', $project), $this->uploadPayload([
-                'file' => UploadedFile::fake()->create($category.'.txt', 1, 'text/plain'),
+                'file' => UploadedFile::fake()->create('admin-'.$category.'.txt', 1, 'text/plain'),
                 'file_category' => $category,
             ]))->assertRedirect();
 
             $this->assertDatabaseHas('workflow_files', [
                 'project_id' => $project->id,
-                'original_name' => $category.'.txt',
+                'original_name' => 'admin-'.$category.'.txt',
                 'file_category' => $category,
             ]);
         }
+
+        foreach (['follow_up', 'deliverable', 'evidence', 'attachment', 'other'] as $category) {
+            $this->actingAs($coordinator)->post(route('projects.files.store', $project), $this->uploadPayload([
+                'file' => UploadedFile::fake()->create('coord-'.$category.'.txt', 1, 'text/plain'),
+                'file_category' => $category,
+            ]))->assertRedirect();
+
+            $this->assertDatabaseHas('workflow_files', [
+                'project_id' => $project->id,
+                'original_name' => 'coord-'.$category.'.txt',
+                'file_category' => $category,
+            ]);
+        }
+
+        $this->actingAs($coordinator)->post(route('projects.files.store', $project), $this->uploadPayload([
+            'file' => UploadedFile::fake()->create('coord-requirement.txt', 1, 'text/plain'),
+            'file_category' => 'requirement',
+        ]))->assertSessionHasErrors('file_category');
     }
 
     public function test_attachment_components_expose_category_selector_badge_and_ai_helper_text(): void
@@ -583,14 +603,35 @@ class WorkflowFileTest extends TestCase
         $this->assertStringContainsString("formData.append('file_category', fileCategory)", $fileList);
         $this->assertStringContainsString('File Category', $fileList);
         $this->assertStringContainsString('Requirement', $fileList);
-        $this->assertStringContainsString('Deliverable', $fileList);
-        $this->assertStringContainsString('Evidence', $fileList);
+        $this->assertStringContainsString('defaultFileCategory', $fileList);
+        $this->assertStringContainsString('categoryOptions.map', $fileList);
         $this->assertStringContainsString('AI comparison requires at least one Requirement file and one Deliverable/Evidence file.', $fileList);
         $this->assertStringContainsString('categoryLabel(file.file_category)', $fileCard);
+        $this->assertStringContainsString('Follow-up', $fileCard);
         $this->assertStringContainsString('Attachment', $fileCard);
         $this->assertStringContainsString('<ProgressComparison result={comparisonResult} />', $projectShow);
         $this->assertStringNotContainsString("['Project setup', 'Task planning', 'Delivery review']", $projectShow);
         $this->assertStringContainsString('Run AI comparison after uploading requirement and deliverable/evidence files.', $progressComparison);
+    }
+    public function test_project_detail_file_category_props_are_role_aware(): void
+    {
+        $admin = $this->makeAdmin('admin-category-props@example.com');
+        $coordinator = $this->makeCoordinator('coord-category-props@example.com');
+        $project = Project::factory()->create(['created_by' => $admin->id]);
+        $this->assignCoordinator($project, $coordinator, $admin);
+
+        $this->actingAs($admin)->get(route('projects.show', $project))->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('defaultFileCategory', 'requirement')
+            ->where('fileCategoryOptions.0.value', 'requirement')
+            ->where('fileCategoryOptions.1.value', 'attachment')
+            ->where('fileUploadHelperText', 'Upload the project requirement or instruction file. Coordinator follow-up/evidence files will be compared against this requirement.'));
+
+        $this->actingAs($coordinator)->get(route('projects.show', $project))->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('defaultFileCategory', 'follow_up')
+            ->where('fileCategoryOptions.0.value', 'follow_up')
+            ->where('fileCategoryOptions.1.value', 'deliverable')
+            ->where('fileCategoryOptions.2.value', 'evidence')
+            ->where('fileUploadHelperText', 'Upload follow-up, deliverable, or evidence files after completing assigned work. PM/Admin will use these for AI comparison.'));
     }
     protected function uploadPayload(array $overrides = []): array
     {
@@ -678,6 +719,11 @@ class WorkflowFileTest extends TestCase
         return $user;
     }
 }
+
+
+
+
+
 
 
 

@@ -19,7 +19,7 @@ type ComparisonResult = {
     created_at: string | null;
 };
 
-export default function Show({ subtask, statuses = ['pending', 'in_progress', 'submitted'], action, closeHref, messages = [], canCreateMessage = false, messageStoreUrl, allowedMessageTypes = [], defaultMessageType = 'progress_note', files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 10, fileSectionLabel = 'Evidence / Attachments', comparisonResult = null, isComparisonConfigured = false, comparisonRunUrl = null, comparisonClearUrl = null }: { subtask: Subtask; statuses: string[]; action: string; closeHref?: string; messages?: any[]; files?: any[]; canUploadFile?: boolean; fileUploadUrl?: string | null; allowedFileTypes?: string; maxFileSizeMb?: number; fileSectionLabel?: string; canCreateMessage?: boolean; messageStoreUrl?: string | null; allowedMessageTypes?: any[]; defaultMessageType?: string; comparisonResult?: ComparisonResult | null; isComparisonConfigured?: boolean; comparisonRunUrl?: string | null; comparisonClearUrl?: string | null }) {
+export default function Show({ subtask, statuses = ['pending', 'in_progress', 'submitted'], action, closeHref, messages = [], canCreateMessage = false, messageStoreUrl, allowedMessageTypes = [], defaultMessageType = 'progress_note', files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 10, fileSectionLabel = 'Evidence / Attachments', fileCategoryOptions = [], defaultFileCategory, fileUploadHelperText, comparisonResult = null, isComparisonConfigured = false, comparisonRunUrl = null, comparisonClearUrl = null }: { subtask: Subtask; statuses: string[]; action: string; closeHref?: string; messages?: any[]; files?: any[]; canUploadFile?: boolean; fileUploadUrl?: string | null; allowedFileTypes?: string; maxFileSizeMb?: number; fileSectionLabel?: string; fileCategoryOptions?: any[]; defaultFileCategory?: string; fileUploadHelperText?: string; canCreateMessage?: boolean; messageStoreUrl?: string | null; allowedMessageTypes?: any[]; defaultMessageType?: string; comparisonResult?: ComparisonResult | null; isComparisonConfigured?: boolean; comparisonRunUrl?: string | null; comparisonClearUrl?: string | null }) {
     const { data, setData, patch, processing, errors } = useForm({ status: subtask.status || 'pending', progress_note: subtask.progress_note || '' });
 
     function submit(event: React.FormEvent) { event.preventDefault(); patch(action); }
@@ -38,7 +38,7 @@ export default function Show({ subtask, statuses = ['pending', 'in_progress', 's
             <Head title="Work Item Details" />
             <DetailModal title={subtask.title} description={subtask.description || 'Work Item Details'} onCloseHref={closeHref || route('my-work-items.index')}>
                 <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">{items.map((item) => <div key={item.label}><p className="mb-1 text-xs font-medium text-gray-500">{item.label}</p><div className="text-sm font-semibold text-gray-950">{item.value}</div></div>)}</div>
-                <FileList files={files} canUploadFile={canUploadFile} fileUploadUrl={fileUploadUrl} allowedFileTypes={allowedFileTypes} maxFileSizeMb={maxFileSizeMb} title={fileSectionLabel} />
+                <FileList files={files} canUploadFile={canUploadFile} fileUploadUrl={fileUploadUrl} allowedFileTypes={allowedFileTypes} maxFileSizeMb={maxFileSizeMb} title={fileSectionLabel} fileCategoryOptions={fileCategoryOptions} defaultFileCategory={defaultFileCategory} fileUploadHelperText={fileUploadHelperText} />
                 <RequirementDeliverableComparison isConfigured={isComparisonConfigured} result={comparisonResult} runUrl={comparisonRunUrl || ''} clearUrl={comparisonClearUrl || ''} />
                 <ProgressComparison expected={['Review assignment', 'Update progress', 'Submit work']} completed={subtask.status === 'submitted' ? ['Review assignment', 'Update progress'] : []} />
                 <MessageThread messages={messages} canCreateMessage={canCreateMessage} messageStoreUrl={messageStoreUrl} allowedMessageTypes={allowedMessageTypes} defaultMessageType={defaultMessageType} viewAllHref={route('subtasks.messages.index', subtask.id)} />
@@ -47,5 +47,6 @@ export default function Show({ subtask, statuses = ['pending', 'in_progress', 's
         </AuthenticatedLayout>
     );
 }
+
 
 

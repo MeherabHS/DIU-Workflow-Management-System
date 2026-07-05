@@ -213,6 +213,12 @@ class WorkflowNotificationService
             return;
         }
 
+        if (! $task && ! $subtask && $this->isCoordinatorFollowUpFile($file)) {
+            $this->notifyCoordinatorFollowUpFileUploaded($file, $project, $uploaderId);
+
+            return;
+        }
+
         $recipients = $this->resolveFileRecipients($project, $task, $subtask);
 
         $contextLabel = $subtask ? 'work item' : ($task ? 'task' : 'project');
@@ -263,6 +269,42 @@ class WorkflowNotificationService
             'body' => "Progress was updated on work item: {$subtask->title}",
             'action_url' => $this->relativeRoute('subtasks.show', $subtask),
         ]);
+    }
+    protected function isCoordinatorFollowUpFile(WorkflowFile $file): bool
+    {
+        $uploader = $file->uploader;
+
+        return $uploader?->hasRole('Coordinator') === true
+            && in_array($file->file_category, ['follow_up', 'deliverable', 'evidence'], true);
+    }
+
+    protected function notifyCoordinatorFollowUpFileUploaded(WorkflowFile $file, Project $project, int $uploaderId): void
+    {
+        $uploaderName = $file->uploader?->name ?? 'Coordinator';
+        $categoryLabel = match ($file->file_category) {
+            'follow_up' => 'follow-up',
+            'deliverable' => 'deliverable',
+            'evidence' => 'evidence',
+            default => 'follow-up',
+        };
+
+        $recipients = collect();
+
+        if ($project->creator) {
+            $recipients->push($project->creator);
+        }
+
+        User::role('Admin')->each(fn (User $u) => $recipients->push($u));
+
+        $this->notifyMany($recipients, [
+            'actor_id' => $uploaderId,
+            'project_id' => $project->id,
+            'workflow_file_id' => $file->id,
+            'type' => 'file_uploaded',
+            'title' => 'Follow-up file uploaded',
+            'body' => "{$uploaderName} uploaded a {$categoryLabel} file for {$project->title}.",
+            'action_url' => $this->relativeRoute('projects.show', $project),
+        ], $uploaderId);
     }
 
     protected function resolveMessageRecipients(Project $project, ?Task $task = null, ?Subtask $subtask = null): Collection
@@ -321,5 +363,6 @@ class WorkflowNotificationService
         return $recipients->unique('id');
     }
 }
+
 
 

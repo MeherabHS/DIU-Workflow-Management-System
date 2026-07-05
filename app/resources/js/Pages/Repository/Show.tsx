@@ -7,7 +7,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 
 type RepositoryStatusOption = { value: string; label: string };
 
-export default function Show({ entry, statuses = [], files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 10, fileSectionLabel = 'Attachments' }: { entry: RepositoryEntry; statuses: RepositoryStatusOption[]; files?: any[]; canUploadFile?: boolean; fileUploadUrl?: string | null; allowedFileTypes?: string; maxFileSizeMb?: number; fileSectionLabel?: string }) {
+export default function Show({ entry, statuses = [], files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 10, fileSectionLabel = 'Attachments', fileCategoryOptions = [], defaultFileCategory, fileUploadHelperText }: { entry: RepositoryEntry; statuses: RepositoryStatusOption[]; files?: any[]; canUploadFile?: boolean; fileUploadUrl?: string | null; allowedFileTypes?: string; maxFileSizeMb?: number; fileSectionLabel?: string; fileCategoryOptions?: any[]; defaultFileCategory?: string; fileUploadHelperText?: string }) {
     const { data, setData, post, processing, errors } = useForm({ update_type: 'status_update', new_status: '', note: '' });
 
     function submit(event: React.FormEvent) {
@@ -28,7 +28,7 @@ export default function Show({ entry, statuses = [], files = [], canUploadFile =
                 { label: 'Responsible Person', value: entry.responsible_user?.name || entry.responsibleUser?.name || 'Not set' },
                 { label: 'Created By', value: entry.creator?.name || 'Not set' },
             ]} />
-            <FileList files={files} canUploadFile={canUploadFile} fileUploadUrl={fileUploadUrl} allowedFileTypes={allowedFileTypes} maxFileSizeMb={maxFileSizeMb} title={fileSectionLabel} />
+            <FileList files={files} canUploadFile={canUploadFile} fileUploadUrl={fileUploadUrl} allowedFileTypes={allowedFileTypes} maxFileSizeMb={maxFileSizeMb} title={fileSectionLabel} fileCategoryOptions={fileCategoryOptions} defaultFileCategory={defaultFileCategory} fileUploadHelperText={fileUploadHelperText} />
             <Card className="mt-5 p-5">
                 <h2 className="text-base font-bold text-gray-950">Timeline Updates</h2>
                 <div className="mt-4 divide-y divide-gray-100">
@@ -99,4 +99,6 @@ export default function Show({ entry, statuses = [], files = [], canUploadFile =
         </AuthenticatedLayout>
     );
 }
+
+
 

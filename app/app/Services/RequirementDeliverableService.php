@@ -36,7 +36,7 @@ class RequirementDeliverableService
             return [
                 'isConfigured' => true,
                 'status' => 'no_requirements',
-                'summary' => 'No requirement file has been uploaded yet. Upload a file with category Requirement.',
+                'summary' => 'Upload a Requirement file first. Usually this is the PM/Admin instruction or project requirement.',
                 'completion_percentage' => 0,
                 ...$this->emptyStructuredFields(),
             ];
@@ -46,7 +46,7 @@ class RequirementDeliverableService
             return [
                 'isConfigured' => true,
                 'status' => 'no_deliverables',
-                'summary' => 'Requirement file found, but no deliverable or evidence file has been uploaded yet.',
+                'summary' => 'Requirement found. Waiting for Coordinator follow-up, deliverable, or evidence file.',
                 'completion_percentage' => 0,
                 ...$this->emptyStructuredFields(),
             ];
@@ -229,7 +229,7 @@ class RequirementDeliverableService
 
     protected function getDeliverableFiles(Project|Task|Subtask $context): array
     {
-        $categories = ['deliverable', 'evidence', 'attachment'];
+        $categories = ['follow_up', 'deliverable', 'evidence', 'attachment'];
 
         if ($context instanceof Subtask) {
             return WorkflowFile::where('subtask_id', $context->id)
@@ -396,3 +396,5 @@ class RequirementDeliverableService
             ->all();
     }
 }
+
+

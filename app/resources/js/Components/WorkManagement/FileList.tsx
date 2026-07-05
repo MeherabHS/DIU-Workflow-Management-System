@@ -1,7 +1,12 @@
 import { router } from '@inertiajs/react';
 import { FileText, Paperclip, Upload } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import FileCard, { WorkflowFile } from './FileCard';
+
+type FileCategoryOption = {
+    value: string;
+    label: string;
+};
 
 type FileListProps = {
     files?: WorkflowFile[];
@@ -10,19 +15,27 @@ type FileListProps = {
     allowedFileTypes?: string;
     maxFileSizeMb?: number;
     title?: string;
+    fileCategoryOptions?: FileCategoryOption[];
+    defaultFileCategory?: string;
+    fileUploadHelperText?: string;
 };
 
-const fileCategoryOptions = [
-    { value: 'requirement', label: 'Requirement' },
-    { value: 'deliverable', label: 'Deliverable' },
-    { value: 'evidence', label: 'Evidence' },
+const fallbackFileCategoryOptions = [
+    { value: 'attachment', label: 'Attachment' },
     { value: 'other', label: 'Other' },
 ];
 
-export default function FileList({ files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 100, title = 'Attachments' }: FileListProps) {
+export default function FileList({ files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 100, title = 'Attachments', fileCategoryOptions = fallbackFileCategoryOptions, defaultFileCategory, fileUploadHelperText = 'AI comparison requires at least one Requirement file and one Deliverable/Evidence file.' }: FileListProps) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [uploading, setUploading] = useState(false);
-    const [fileCategory, setFileCategory] = useState('other');
+    const categoryOptions = useMemo(() => fileCategoryOptions.length ? fileCategoryOptions : fallbackFileCategoryOptions, [fileCategoryOptions]);
+    const initialCategory = defaultFileCategory && categoryOptions.some((option) => option.value === defaultFileCategory) ? defaultFileCategory : categoryOptions[0]?.value || 'attachment';
+    const [fileCategory, setFileCategory] = useState(initialCategory);
+
+    useEffect(() => {
+        const nextCategory = defaultFileCategory && categoryOptions.some((option) => option.value === defaultFileCategory) ? defaultFileCategory : categoryOptions[0]?.value || 'attachment';
+        setFileCategory((current) => categoryOptions.some((option) => option.value === current) ? current : nextCategory);
+    }, [categoryOptions, defaultFileCategory]);
 
     function uploadFile(file: File | null | undefined) {
         if (!file || !fileUploadUrl) return;
@@ -60,7 +73,7 @@ export default function FileList({ files = [], canUploadFile = false, fileUpload
                                     onChange={(event) => setFileCategory(event.target.value)}
                                     className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
                                 >
-                                    {fileCategoryOptions.map((option) => (
+                                    {categoryOptions.map((option) => (
                                         <option key={option.value} value={option.value}>{option.label}</option>
                                     ))}
                                 </select>
@@ -69,7 +82,7 @@ export default function FileList({ files = [], canUploadFile = false, fileUpload
                                 <Upload className="h-3.5 w-3.5" />
                                 {uploading ? 'Uploading' : 'Upload'}
                             </button>
-                            <span className="max-w-xs text-left text-xs text-gray-500 md:text-right">AI comparison requires at least one Requirement file and one Deliverable/Evidence file. Maximum file size: {maxFileSizeMb}MB</span>
+                            <span className="max-w-xs text-left text-xs text-gray-500 md:text-right">{fileUploadHelperText} Maximum file size: {maxFileSizeMb}MB</span>
                         </div>
                     </>
                 )}

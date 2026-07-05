@@ -32,7 +32,7 @@ type Props = {
     submitForReviewUrl?: string | null;
     alreadyFinalized?: { id: number; route: string; finalized_at: string; finalized_by: string } | null;
     closeHref?: string;
-    messages?: any[]; files?: any[]; canUploadFile?: boolean; fileUploadUrl?: string | null; allowedFileTypes?: string; maxFileSizeMb?: number; fileSectionLabel?: string;
+    messages?: any[]; files?: any[]; canUploadFile?: boolean; fileUploadUrl?: string | null; allowedFileTypes?: string; maxFileSizeMb?: number; fileSectionLabel?: string; fileCategoryOptions?: any[]; defaultFileCategory?: string; fileUploadHelperText?: string;
     canCreateMessage?: boolean;
     messageStoreUrl?: string | null;
     allowedMessageTypes?: any[]; defaultMessageType?: string;
@@ -42,7 +42,7 @@ type Props = {
     comparisonClearUrl?: string | null;
 };
 
-export default function Show({ project, pageTitle = 'Project Details', canViewTasks = false, canCreateTask = false, canAssignCoordinator = false, canUpdateProject = false, canFinalizeProject = false, canSubmitForReview = false, submitForReviewUrl = null, alreadyFinalized = null, closeHref, messages = [], canCreateMessage = false, messageStoreUrl, allowedMessageTypes = [], defaultMessageType = 'message', files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 10, fileSectionLabel = 'Attachments', comparisonResult = null, isComparisonConfigured = false, comparisonRunUrl = null, comparisonClearUrl = null }: Props) {
+export default function Show({ project, pageTitle = 'Project Details', canViewTasks = false, canCreateTask = false, canAssignCoordinator = false, canUpdateProject = false, canFinalizeProject = false, canSubmitForReview = false, submitForReviewUrl = null, alreadyFinalized = null, closeHref, messages = [], canCreateMessage = false, messageStoreUrl, allowedMessageTypes = [], defaultMessageType = 'message', files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 10, fileSectionLabel = 'Attachments', fileCategoryOptions = [], defaultFileCategory, fileUploadHelperText, comparisonResult = null, isComparisonConfigured = false, comparisonRunUrl = null, comparisonClearUrl = null }: Props) {
     const { post: finalizePost, processing: finalizing } = useForm({});
     const { post: submitPost, processing: submittingForReview } = useForm({});
 
@@ -79,7 +79,7 @@ export default function Show({ project, pageTitle = 'Project Details', canViewTa
                     {items.map((item) => <div key={item.label} className="min-w-0"><p className="text-xs font-medium uppercase tracking-wide text-gray-500">{item.label}</p><div className="mt-1 break-words text-sm font-semibold text-gray-950">{item.value}</div></div>)}
                 </div>
                 <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="text-base font-semibold text-gray-950">Assigned To</h2>{canAssignCoordinator && <Link href={route('projects.assign-coordinator.edit', project.id)} className="text-sm font-semibold text-gray-900">Assign Coordinator</Link>}</div><AssignmentChips users={users} /></section>
-                <FileList files={files} canUploadFile={canUploadFile} fileUploadUrl={fileUploadUrl} allowedFileTypes={allowedFileTypes} maxFileSizeMb={maxFileSizeMb} title={fileSectionLabel} />
+                <FileList files={files} canUploadFile={canUploadFile} fileUploadUrl={fileUploadUrl} allowedFileTypes={allowedFileTypes} maxFileSizeMb={maxFileSizeMb} title={fileSectionLabel} fileCategoryOptions={fileCategoryOptions} defaultFileCategory={defaultFileCategory} fileUploadHelperText={fileUploadHelperText} />
                 <RequirementDeliverableComparison isConfigured={isComparisonConfigured} result={comparisonResult} runUrl={comparisonRunUrl || ''} clearUrl={comparisonClearUrl || ''} />
                 <ProgressComparison result={comparisonResult} />
                 <MessageThread messages={messages} canCreateMessage={canCreateMessage} messageStoreUrl={messageStoreUrl} allowedMessageTypes={allowedMessageTypes} defaultMessageType={defaultMessageType} viewAllHref={route('projects.messages.index', project.id)} />
@@ -88,3 +88,4 @@ export default function Show({ project, pageTitle = 'Project Details', canViewTa
         </AuthenticatedLayout>
     );
 }
+

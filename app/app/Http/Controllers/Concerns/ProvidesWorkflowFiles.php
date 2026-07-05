@@ -26,7 +26,80 @@ trait ProvidesWorkflowFiles
             'allowedFileTypes' => app(WorkflowFileService::class)->acceptAttribute(),
             'maxFileSizeMb' => app(WorkflowFileService::class)->maxUploadMegabytes(),
             'fileSectionLabel' => $sectionLabel,
+            'fileCategoryOptions' => $this->workflowFileCategoryOptions($context, $user),
+            'defaultFileCategory' => $this->defaultWorkflowFileCategory($context, $user),
+            'fileUploadHelperText' => $this->workflowFileUploadHelperText($context, $user),
         ];
+    }
+    protected function workflowFileCategoryOptions(Project|Task|Subtask|RepositoryEntry $context, User $user): array
+    {
+        $labels = [
+            'requirement' => 'Requirement',
+            'follow_up' => 'Follow-up',
+            'deliverable' => 'Deliverable',
+            'evidence' => 'Evidence',
+            'attachment' => 'Attachment',
+            'other' => 'Other',
+            'repository_document' => 'Repository Document',
+        ];
+
+        return collect($this->workflowFileCategoryValues($context, $user))
+            ->map(fn (string $value): array => ['value' => $value, 'label' => $labels[$value] ?? ucfirst(str_replace('_', ' ', $value))])
+            ->values()
+            ->all();
+    }
+
+    protected function workflowFileCategoryValues(Project|Task|Subtask|RepositoryEntry $context, User $user): array
+    {
+        if ($context instanceof Project) {
+            if ($user->hasAnyRole(['Admin', 'PM/Manager'])) {
+                return ['requirement', 'attachment', 'other'];
+            }
+
+            if ($user->hasRole('Coordinator')) {
+                return ['follow_up', 'deliverable', 'evidence', 'attachment', 'other'];
+            }
+        }
+
+        if ($context instanceof Subtask) {
+            if ($user->hasRole('Subordinate')) {
+                return ['evidence', 'attachment', 'other'];
+            }
+
+            return ['follow_up', 'deliverable', 'evidence', 'attachment', 'other'];
+        }
+
+        if ($context instanceof RepositoryEntry) {
+            return ['repository_document', 'attachment', 'other'];
+        }
+
+        return ['requirement', 'follow_up', 'deliverable', 'evidence', 'attachment', 'other'];
+    }
+
+    protected function defaultWorkflowFileCategory(Project|Task|Subtask|RepositoryEntry $context, User $user): string
+    {
+        if ($context instanceof Project) {
+            return $user->hasAnyRole(['Admin', 'PM/Manager']) ? 'requirement' : 'follow_up';
+        }
+
+        if ($context instanceof Subtask && $user->hasRole('Subordinate')) {
+            return 'evidence';
+        }
+
+        return $this->workflowFileCategoryValues($context, $user)[0] ?? 'attachment';
+    }
+
+    protected function workflowFileUploadHelperText(Project|Task|Subtask|RepositoryEntry $context, User $user): string
+    {
+        if ($context instanceof Project && $user->hasAnyRole(['Admin', 'PM/Manager'])) {
+            return 'Upload the project requirement or instruction file. Coordinator follow-up/evidence files will be compared against this requirement.';
+        }
+
+        if ($context instanceof Project && $user->hasRole('Coordinator')) {
+            return 'Upload follow-up, deliverable, or evidence files after completing assigned work. PM/Admin will use these for AI comparison.';
+        }
+
+        return 'AI comparison requires at least one Requirement file and one Deliverable/Evidence file.';
     }
 
     protected function workflowFilesFor(Project|Task|Subtask|RepositoryEntry $context): EloquentCollection
@@ -112,5 +185,6 @@ trait ProvidesWorkflowFiles
         ];
     }
 }
+
 
 

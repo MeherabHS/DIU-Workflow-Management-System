@@ -21,6 +21,7 @@ function metaText(file: WorkflowFile) {
 function categoryLabel(category?: string | null) {
     const labels: Record<string, string> = {
         requirement: 'Requirement',
+        follow_up: 'Follow-up',
         deliverable: 'Deliverable',
         evidence: 'Evidence',
         other: 'Other',
@@ -62,3 +63,5 @@ export default function FileCard({ file }: { file: WorkflowFile }) {
         </div>
     );
 }
+
+

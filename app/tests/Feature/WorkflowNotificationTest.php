@@ -771,6 +771,50 @@ class WorkflowNotificationTest extends TestCase
             ->where('subtask_id', $subtask->id)
             ->count());
     }
+    public function test_coordinator_follow_up_project_file_notifies_project_creator_and_admins(): void
+    {
+        Storage::fake('local');
+
+        $creator = $this->makePm('pm-follow-up-recipient@example.com');
+        $admin = $this->makeAdmin('admin-follow-up-recipient@example.com');
+        $coordinator = $this->makeCoordinator('coord-follow-up-uploader@example.com');
+        $otherCoordinator = $this->makeCoordinator('coord-follow-up-unrelated@example.com');
+        $project = Project::factory()->create(['created_by' => $creator->id]);
+        $this->assignCoordinator($project, $coordinator, $admin);
+
+        $file = \Illuminate\Http\UploadedFile::fake()->create('registrar-progress.pdf', 100, 'application/pdf');
+
+        $this->actingAs($coordinator)
+            ->post(route('projects.files.store', $project), [
+                'file' => $file,
+                'file_category' => 'follow_up',
+            ])
+            ->assertRedirect();
+
+        $storedFile = WorkflowFile::where('original_name', 'registrar-progress.pdf')->firstOrFail();
+
+        foreach ([$creator, $admin] as $recipient) {
+            $this->assertDatabaseHas('workflow_notifications', [
+                'user_id' => $recipient->id,
+                'actor_id' => $coordinator->id,
+                'project_id' => $project->id,
+                'workflow_file_id' => $storedFile->id,
+                'type' => 'file_uploaded',
+                'title' => 'Follow-up file uploaded',
+                'body' => "{$coordinator->name} uploaded a follow-up file for {$project->title}.",
+                'action_url' => '/projects/'.$project->id,
+            ]);
+        }
+
+        $this->assertDatabaseMissing('workflow_notifications', [
+            'user_id' => $coordinator->id,
+            'workflow_file_id' => $storedFile->id,
+        ]);
+        $this->assertDatabaseMissing('workflow_notifications', [
+            'user_id' => $otherCoordinator->id,
+            'workflow_file_id' => $storedFile->id,
+        ]);
+    }
     // Helper methods
 
     protected function assignCoordinator(Project $project, User $coordinator, User $assigner): ProjectAssignment
@@ -828,6 +872,7 @@ class WorkflowNotificationTest extends TestCase
         return $user;
     }
 }
+
 
 
 

@@ -20,9 +20,9 @@ type ComparisonResult = {
     created_at: string | null;
 };
 
-type Props = { subtask: Subtask; canAssignSubordinate?: boolean; canRevokeSubordinate?: boolean; canUpdateSubtask?: boolean; messages?: any[]; files?: any[]; canUploadFile?: boolean; fileUploadUrl?: string | null; allowedFileTypes?: string; maxFileSizeMb?: number; fileSectionLabel?: string; canCreateMessage?: boolean; messageStoreUrl?: string | null; allowedMessageTypes?: any[]; defaultMessageType?: string; comparisonResult?: ComparisonResult | null; isComparisonConfigured?: boolean; comparisonRunUrl?: string | null; comparisonClearUrl?: string | null };
+type Props = { subtask: Subtask; canAssignSubordinate?: boolean; canRevokeSubordinate?: boolean; canUpdateSubtask?: boolean; messages?: any[]; files?: any[]; canUploadFile?: boolean; fileUploadUrl?: string | null; allowedFileTypes?: string; maxFileSizeMb?: number; fileSectionLabel?: string; fileCategoryOptions?: any[]; defaultFileCategory?: string; fileUploadHelperText?: string; canCreateMessage?: boolean; messageStoreUrl?: string | null; allowedMessageTypes?: any[]; defaultMessageType?: string; comparisonResult?: ComparisonResult | null; isComparisonConfigured?: boolean; comparisonRunUrl?: string | null; comparisonClearUrl?: string | null };
 
-export default function Show({ subtask, canAssignSubordinate = false, canRevokeSubordinate = false, canUpdateSubtask = false, messages = [], canCreateMessage = false, messageStoreUrl, allowedMessageTypes = [], defaultMessageType = 'message', files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 10, fileSectionLabel = 'Evidence / Attachments', comparisonResult = null, isComparisonConfigured = false, comparisonRunUrl = null, comparisonClearUrl = null }: Props) {
+export default function Show({ subtask, canAssignSubordinate = false, canRevokeSubordinate = false, canUpdateSubtask = false, messages = [], canCreateMessage = false, messageStoreUrl, allowedMessageTypes = [], defaultMessageType = 'message', files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 10, fileSectionLabel = 'Evidence / Attachments', fileCategoryOptions = [], defaultFileCategory, fileUploadHelperText, comparisonResult = null, isComparisonConfigured = false, comparisonRunUrl = null, comparisonClearUrl = null }: Props) {
     const activeAssignments = (subtask.assignments || []).filter((assignment) => !assignment.revoked_at);
     const assignedUsers = activeAssignments.map((assignment) => assignment.subordinate).filter(Boolean) as Array<{ id: number; name: string; email?: string }>;
     const items = [
@@ -40,7 +40,7 @@ export default function Show({ subtask, canAssignSubordinate = false, canRevokeS
             <DetailModal title={subtask.title} description={subtask.description || 'Work Item Details'} onCloseHref={subtask.task ? route('tasks.show', subtask.task.id) : route('dashboard')} actions={<>{canAssignSubordinate && <Link href={route('subtasks.assign-subordinate.edit', subtask.id)} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-700">Assign Subordinate</Link>}{canUpdateSubtask && <Link href={route('subtasks.edit', subtask.id)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50">Edit Work Item</Link>}</>}>
                 <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">{items.map((item) => <div key={item.label} className="min-w-0"><p className="text-xs font-medium uppercase tracking-wide text-gray-500">{item.label}</p><div className="mt-1 break-words text-sm font-semibold text-gray-950">{item.value}</div></div>)}</div>
                 <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="text-base font-semibold text-gray-950">Assigned To</h2>{canAssignSubordinate && <Link href={route('subtasks.assign-subordinate.edit', subtask.id)} className="text-sm font-semibold text-gray-900">Assign Subordinate</Link>}</div><AssignmentChips users={assignedUsers} /></section>
-                <FileList files={files} canUploadFile={canUploadFile} fileUploadUrl={fileUploadUrl} allowedFileTypes={allowedFileTypes} maxFileSizeMb={maxFileSizeMb} title={fileSectionLabel} />
+                <FileList files={files} canUploadFile={canUploadFile} fileUploadUrl={fileUploadUrl} allowedFileTypes={allowedFileTypes} maxFileSizeMb={maxFileSizeMb} title={fileSectionLabel} fileCategoryOptions={fileCategoryOptions} defaultFileCategory={defaultFileCategory} fileUploadHelperText={fileUploadHelperText} />
                 <RequirementDeliverableComparison isConfigured={isComparisonConfigured} result={comparisonResult} runUrl={comparisonRunUrl || ''} clearUrl={comparisonClearUrl || ''} />
                 <ProgressComparison expected={['Assignment', 'Progress update', 'Submission']} completed={subtask.status === 'completed' || subtask.status === 'approved' ? ['Assignment', 'Progress update', 'Submission'] : []} />
                 <MessageThread messages={messages} canCreateMessage={canCreateMessage} messageStoreUrl={messageStoreUrl} allowedMessageTypes={allowedMessageTypes} defaultMessageType={defaultMessageType} viewAllHref={route('subtasks.messages.index', subtask.id)} />
@@ -50,5 +50,6 @@ export default function Show({ subtask, canAssignSubordinate = false, canRevokeS
         </AuthenticatedLayout>
     );
 }
+
 
 
