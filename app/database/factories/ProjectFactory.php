@@ -25,6 +25,7 @@ class ProjectFactory extends Factory
             'priority' => fake()->randomElement(['low', 'medium', 'high']),
             'start_date' => fake()->dateTimeBetween('-1 week', '+1 week')->format('Y-m-d'),
             'deadline' => fake()->dateTimeBetween('+1 week', '+1 month')->format('Y-m-d'),
+            'submitted_at' => null,
             'completed_at' => null,
             'archived_at' => null,
         ];

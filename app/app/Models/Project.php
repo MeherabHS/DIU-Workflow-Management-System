@@ -25,6 +25,7 @@ class Project extends Model
         'priority',
         'start_date',
         'deadline',
+        'submitted_at',
         'completed_at',
         'archived_at',
     ];
@@ -34,6 +35,7 @@ class Project extends Model
         return [
             'start_date' => 'date',
             'deadline' => 'date',
+            'submitted_at' => 'datetime',
             'completed_at' => 'datetime',
             'archived_at' => 'datetime',
         ];
@@ -99,5 +101,3 @@ class Project extends Model
         return $this->hasMany(ArchiveRecord::class);
     }
 }
-
-

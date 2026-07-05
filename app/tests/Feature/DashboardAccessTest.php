@@ -282,7 +282,7 @@ class DashboardAccessTest extends TestCase
                 ->where('kpis.1.label', 'Completed')
                 ->where('kpis.1.value', 1)
                 ->where('kpis.2.label', 'Due')
-                ->where('kpis.2.value', 4)
+                ->where('kpis.2.value', 3)
                 ->where('kpis.3.label', 'Overdue')
                 ->where('kpis.3.value', 1)
                 ->where('kpis.4.label', 'Total Projects')
@@ -298,6 +298,32 @@ class DashboardAccessTest extends TestCase
                 }));
     }
 
+    public function test_dashboard_due_and_overdue_exclude_submitted_projects(): void
+    {
+        $admin = User::factory()->create();
+        $admin->syncRoles(['Admin']);
+
+        Project::factory()->create(['status' => 'in_progress', 'deadline' => now()->subDay()->toDateString()]);
+        Project::factory()->create(['status' => 'submitted', 'deadline' => now()->subDay()->toDateString(), 'submitted_at' => now()->subDays(2)]);
+        Project::factory()->create(['status' => 'in_progress', 'deadline' => now()->addDay()->toDateString()]);
+        Project::factory()->create(['status' => 'submitted', 'deadline' => now()->addDay()->toDateString(), 'submitted_at' => now()]);
+
+        $this->actingAs($admin)
+            ->get('/admin/dashboard')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('kpis.2.label', 'Due')
+                ->where('kpis.2.value', 1)
+                ->where('kpis.3.label', 'Overdue')
+                ->where('kpis.3.value', 1)
+                ->where('dashboardProjectStatuses', function ($rows) {
+                    $submittedRows = collect($rows)->where('status', 'submitted');
+
+                    return $submittedRows->count() === 2
+                        && $submittedRows->every(fn ($row) => $row['is_overdue'] === false)
+                        && $submittedRows->contains(fn ($row) => $row['is_submitted_late'] === false);
+                }));
+    }
     public function test_pm_dashboard_project_status_filter_payload_remains_scoped_to_owned_projects(): void
     {
         $pm = User::factory()->create();

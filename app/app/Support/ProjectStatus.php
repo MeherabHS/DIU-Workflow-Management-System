@@ -26,7 +26,12 @@ class ProjectStatus
 
     public static function dueEligibleStatuses(): array
     {
-        return ['planned', 'in_progress', 'submitted', 'active'];
+        return self::deadlineOpenStatuses();
+    }
+
+    public static function deadlineOpenStatuses(): array
+    {
+        return ['planned', 'in_progress', 'active'];
     }
 
     public static function dashboardInProgressStatuses(): array

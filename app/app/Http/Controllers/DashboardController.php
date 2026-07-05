@@ -117,6 +117,7 @@ class DashboardController extends Controller
     {
         $now = now()->toDateString();
         $doneStatuses = ProjectStatus::closedStatuses();
+        $deadlineOpenStatuses = ProjectStatus::deadlineOpenStatuses();
 
         // KPI: In Progress - projects with status in_progress or submitted
         $inProgress = Project::query()
@@ -134,7 +135,7 @@ class DashboardController extends Controller
         $due = Project::query()
             ->whereNotNull('deadline')
             ->where('deadline', '>=', $now)
-            ->whereNotIn('status', $doneStatuses)
+            ->whereIn('status', $deadlineOpenStatuses)
             ->when($scopedProjectIds, fn ($q) => $q->whereIn('id', $scopedProjectIds))
             ->count();
 
@@ -142,7 +143,7 @@ class DashboardController extends Controller
         $overdue = Project::query()
             ->whereNotNull('deadline')
             ->where('deadline', '<', $now)
-            ->whereNotIn('status', $doneStatuses)
+            ->whereIn('status', $deadlineOpenStatuses)
             ->when($scopedProjectIds, fn ($q) => $q->whereIn('id', $scopedProjectIds))
             ->count();
 
@@ -173,7 +174,7 @@ class DashboardController extends Controller
 
         $projects = $projectQuery->orderBy('deadline')->orderBy('created_at', 'desc')->limit(100)->get();
 
-        $projectStatuses = $this->dashboardProjectStatusRows($projects, $now, $priorityOrder, $doneStatuses);
+        $projectStatuses = $this->dashboardProjectStatusRows($projects, $now, $priorityOrder, $deadlineOpenStatuses);
 
         // Sort: overdue first, then priority rank (urgent > high > medium), then nearest deadline
         $projectStatuses = $this->sortDashboardProjectStatuses($projectStatuses)->take(10)->values()->all();
@@ -196,7 +197,7 @@ class DashboardController extends Controller
             ->get();
 
         $dashboardProjectStatuses = $this->sortDashboardProjectStatuses(
-            $this->dashboardProjectStatusRows($dashboardProjectStatusProjects, $now, $priorityOrder, $doneStatuses)
+            $this->dashboardProjectStatusRows($dashboardProjectStatusProjects, $now, $priorityOrder, $deadlineOpenStatuses)
         )->values()->all();
 
         // Status donut: completed vs in-progress project counts
@@ -245,10 +246,13 @@ class DashboardController extends Controller
         ];
     }
 
-    protected function dashboardProjectStatusRows(Collection $projects, string $now, array $priorityOrder, array $doneStatuses): Collection
+    protected function dashboardProjectStatusRows(Collection $projects, string $now, array $priorityOrder, array $deadlineOpenStatuses): Collection
     {
-        return $projects->map(function ($p) use ($now, $priorityOrder, $doneStatuses) {
-            $isOverdue = $p->deadline && $p->deadline->toDateString() < $now && ! in_array($p->status, $doneStatuses, true);
+        return $projects->map(function ($p) use ($now, $priorityOrder, $deadlineOpenStatuses) {
+            $status = ProjectStatus::normalize($p->status);
+            $submittedAt = $p->submitted_at?->toDateString();
+            $isOverdue = $p->deadline && $p->deadline->toDateString() < $now && in_array($status, $deadlineOpenStatuses, true);
+            $isSubmittedLate = $status === 'submitted' && $p->deadline && $submittedAt && $submittedAt > $p->deadline->toDateString();
 
             return [
                 'id' => $p->id,
@@ -258,7 +262,9 @@ class DashboardController extends Controller
                 'coordinator' => $p->activePrimaryAssignment?->coordinator?->name,
                 'department' => $p->department?->name,
                 'deadline' => $p->deadline?->format('Y-m-d'),
+                'submitted_at' => $p->submitted_at?->format('Y-m-d'),
                 'is_overdue' => $isOverdue,
+                'is_submitted_late' => $isSubmittedLate,
                 'priority_rank' => $priorityOrder[$p->priority] ?? 99,
             ];
         });

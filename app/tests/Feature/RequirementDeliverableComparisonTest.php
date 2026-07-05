@@ -66,6 +66,59 @@ class RequirementDeliverableComparisonTest extends TestCase
             ]);
     }
 
+    public function test_project_comparison_run_returns_no_requirements_json_when_configured(): void
+    {
+        Config::set('ai_comparison.enabled', true);
+        Config::set('ai_comparison.api_key', 'test-key');
+
+        $admin = $this->makeAdmin();
+        $project = Project::factory()->create();
+
+        $this->actingAs($admin)
+            ->postJson(route('projects.comparison.run', $project))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/json')
+            ->assertJson([
+                'isConfigured' => true,
+                'status' => 'no_requirements',
+                'completion_percentage' => 0,
+                'items' => [],
+            ])
+            ->assertJsonPath('summary', 'No requirement files uploaded yet. Upload a requirement file (PDF, DOCX, TXT, CSV, XLSX) with category "requirement".');
+    }
+
+    public function test_project_show_page_receives_configured_comparison_state_without_running_json_endpoint(): void
+    {
+        Config::set('ai_comparison.enabled', true);
+        Config::set('ai_comparison.api_key', 'test-key');
+
+        $admin = $this->makeAdmin();
+        $project = Project::factory()->create();
+
+        $this->actingAs($admin)
+            ->get(route('projects.show', $project))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('Projects/Show')
+                ->where('isComparisonConfigured', true)
+                ->where('comparisonResult', null)
+                ->where('comparisonRunUrl', route('projects.comparison.run', $project))
+            );
+    }
+
+    public function test_unrelated_user_cannot_run_project_comparison(): void
+    {
+        Config::set('ai_comparison.enabled', true);
+        Config::set('ai_comparison.api_key', 'test-key');
+
+        $unrelatedCoordinator = $this->makeCoordinator('unrelated-run-comparison@example.com');
+        $project = Project::factory()->create();
+
+        $this->actingAs($unrelatedCoordinator)
+            ->postJson(route('projects.comparison.run', $project))
+            ->assertForbidden();
+    }
+
     public function test_txt_extraction_works(): void
     {
         Storage::fake('local');

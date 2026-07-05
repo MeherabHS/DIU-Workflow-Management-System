@@ -87,6 +87,8 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         ->name('projects.assign-coordinator.revoke');
     Route::post('/projects/{project}/finalize-to-repository', [ProjectController::class, 'finalizeToRepository'])
         ->name('projects.finalize-to-repository');
+    Route::post('/projects/{project}/submit-for-review', [ProjectController::class, 'submitForReview'])
+        ->name('projects.submit-for-review');
 
     Route::resource('projects', ProjectController::class)->except(['destroy']);
 

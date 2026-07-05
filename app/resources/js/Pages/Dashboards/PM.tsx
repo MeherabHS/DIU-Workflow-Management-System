@@ -8,7 +8,7 @@ import { useMemo, useState } from 'react';
 
 type Kpi = { label: string; value: number; color: string };
 type StatusFilter = 'all' | 'in_progress' | 'completed' | 'due' | 'overdue';
-type ProjectStatus = { id: number; title: string; status: string | null; priority?: string | null; coordinator?: string | null; department?: string | null; deadline?: string | null; is_overdue?: boolean };
+type ProjectStatus = { id: number; title: string; status: string | null; priority?: string | null; coordinator?: string | null; department?: string | null; deadline?: string | null; submitted_at?: string | null; is_overdue?: boolean; is_submitted_late?: boolean };
 type StatusData = { name: string; value: number; color: string };
 type MonthData = { month: string; completed: number };
 type ModuleItem = { title: string; description: string; href?: string | null; actionLabel?: string | null };
@@ -69,7 +69,7 @@ const todayDateString = (): string => {
     return `${date.getFullYear()}-${month}-${day}`;
 };
 
-const isClosedProject = (project: ProjectStatus): boolean => ['completed', 'archived', 'cancelled'].includes(normalizeStatus(project.status));
+const isDeadlineOpenProject = (project: ProjectStatus): boolean => ['planned', 'in_progress'].includes(normalizeStatus(project.status));
 
 const matchesFilter = (project: ProjectStatus, filter: StatusFilter, today: string): boolean => {
     const status = normalizeStatus(project.status);
@@ -80,17 +80,21 @@ const matchesFilter = (project: ProjectStatus, filter: StatusFilter, today: stri
         case 'completed':
             return status === 'completed';
         case 'due':
-            return Boolean(project.deadline) && !isClosedProject(project) && project.deadline! >= today;
+            return Boolean(project.deadline) && isDeadlineOpenProject(project) && project.deadline! >= today;
         case 'overdue':
-            return Boolean(project.deadline) && !isClosedProject(project) && project.deadline! < today;
+            return Boolean(project.deadline) && isDeadlineOpenProject(project) && project.deadline! < today;
         case 'all':
         default:
             return true;
     }
 };
 
-const humanizeStatus = (status: string | null): string => {
-    const normalizedStatus = normalizeStatus(status);
+const humanizeStatus = (project: ProjectStatus): string => {
+    const normalizedStatus = normalizeStatus(project.status);
+
+    if (normalizedStatus === 'submitted') {
+        return project.is_submitted_late ? 'Submitted Late' : 'Submitted / Awaiting Review';
+    }
 
     if (!normalizedStatus) return 'Pending';
 
@@ -184,7 +188,7 @@ export default function PM({
                                                 </span>
                                             )}
                                             <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor(p.status)}`}>
-                                                {humanizeStatus(p.status)}
+                                                {humanizeStatus(p)}
                                             </span>
                                         </div>
                                     </div>

@@ -28,6 +28,8 @@ type Props = {
     canAssignCoordinator?: boolean;
     canUpdateProject?: boolean;
     canFinalizeProject?: boolean;
+    canSubmitForReview?: boolean;
+    submitForReviewUrl?: string | null;
     alreadyFinalized?: { id: number; route: string; finalized_at: string; finalized_by: string } | null;
     closeHref?: string;
     messages?: any[]; files?: any[]; canUploadFile?: boolean; fileUploadUrl?: string | null; allowedFileTypes?: string; maxFileSizeMb?: number; fileSectionLabel?: string;
@@ -40,14 +42,22 @@ type Props = {
     comparisonClearUrl?: string | null;
 };
 
-export default function Show({ project, pageTitle = 'Project Details', canViewTasks = false, canCreateTask = false, canAssignCoordinator = false, canUpdateProject = false, canFinalizeProject = false, alreadyFinalized = null, closeHref, messages = [], canCreateMessage = false, messageStoreUrl, allowedMessageTypes = [], defaultMessageType = 'message', files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 10, fileSectionLabel = 'Attachments', comparisonResult = null, isComparisonConfigured = false, comparisonRunUrl = null, comparisonClearUrl = null }: Props) {
+export default function Show({ project, pageTitle = 'Project Details', canViewTasks = false, canCreateTask = false, canAssignCoordinator = false, canUpdateProject = false, canFinalizeProject = false, canSubmitForReview = false, submitForReviewUrl = null, alreadyFinalized = null, closeHref, messages = [], canCreateMessage = false, messageStoreUrl, allowedMessageTypes = [], defaultMessageType = 'message', files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 10, fileSectionLabel = 'Attachments', comparisonResult = null, isComparisonConfigured = false, comparisonRunUrl = null, comparisonClearUrl = null }: Props) {
     const { post: finalizePost, processing: finalizing } = useForm({});
+    const { post: submitPost, processing: submittingForReview } = useForm({});
 
     function handleFinalize() {
         if (confirm('Finalize this project to the Repository? This action cannot be undone.')) {
             finalizePost(route('projects.finalize-to-repository', project.id));
         }
     }
+
+    function handleSubmitForReview() {
+        if (submitForReviewUrl) {
+            submitPost(submitForReviewUrl);
+        }
+    }
+
     const coordinator = project.active_primary_assignment?.coordinator || project.activePrimaryAssignment?.coordinator || null;
     const users = coordinator ? [coordinator] as BaseUser[] : [];
     const items = [
@@ -56,6 +66,7 @@ export default function Show({ project, pageTitle = 'Project Details', canViewTa
         { label: 'Priority', value: <PriorityBadge value={project.priority} /> },
         { label: 'Start Date', value: dateText(project.start_date) },
         { label: 'Deadline', value: dateText(project.deadline) },
+        ...(project.submitted_at ? [{ label: 'Submitted', value: dateText(project.submitted_at) }] : []),
         { label: 'Creator', value: project.creator?.name || 'Not set' },
         { label: 'Active Coordinator', value: coordinator?.name || 'Unassigned' },
     ];
@@ -63,7 +74,7 @@ export default function Show({ project, pageTitle = 'Project Details', canViewTa
     return (
         <AuthenticatedLayout>
             <Head title={pageTitle} />
-            <DetailModal title={project.title} description={project.description || 'Project Details'} onCloseHref={closeHref || route('dashboard')} actions={<>{canViewTasks && <Link href={route('project.tasks.index', project.id)} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-700">View Tasks</Link>}{canCreateTask && <Link href={route('project.tasks.create', project.id)} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-700">Create Task</Link>}{canUpdateProject && <Link href={route('projects.edit', project.id)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50">Edit</Link>}{canAssignCoordinator && <Link href={route('projects.assign-coordinator.edit', project.id)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50">Assign Coordinator</Link>}{alreadyFinalized && <Link href={alreadyFinalized.route} className="rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm font-semibold text-green-800 shadow-sm hover:bg-green-100">Finalized in Repository</Link>}{canFinalizeProject && !alreadyFinalized && <button onClick={handleFinalize} disabled={finalizing} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">{finalizing ? 'Finalizing...' : 'Finalize to Repository'}</button>}</>}>
+            <DetailModal title={project.title} description={project.description || 'Project Details'} onCloseHref={closeHref || route('dashboard')} actions={<>{canViewTasks && <Link href={route('project.tasks.index', project.id)} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-700">View Tasks</Link>}{canCreateTask && <Link href={route('project.tasks.create', project.id)} className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-700">Create Task</Link>}{canUpdateProject && <Link href={route('projects.edit', project.id)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50">Edit</Link>}{canAssignCoordinator && <Link href={route('projects.assign-coordinator.edit', project.id)} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50">Assign Coordinator</Link>}{canSubmitForReview && <button type="button" onClick={handleSubmitForReview} disabled={submittingForReview} className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 shadow-sm hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed">{submittingForReview ? 'Submitting...' : 'Submit for Review'}</button>}{alreadyFinalized && <Link href={alreadyFinalized.route} className="rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm font-semibold text-green-800 shadow-sm hover:bg-green-100">Finalized in Repository</Link>}{canFinalizeProject && !alreadyFinalized && <button type="button" onClick={handleFinalize} disabled={finalizing} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">{finalizing ? 'Finalizing...' : 'Finalize to Repository'}</button>}</>}>
                 <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
                     {items.map((item) => <div key={item.label} className="min-w-0"><p className="text-xs font-medium uppercase tracking-wide text-gray-500">{item.label}</p><div className="mt-1 break-words text-sm font-semibold text-gray-950">{item.value}</div></div>)}
                 </div>
@@ -77,5 +88,3 @@ export default function Show({ project, pageTitle = 'Project Details', canViewTa
         </AuthenticatedLayout>
     );
 }
-
-

@@ -303,6 +303,59 @@ class TaskSubtaskWorkflowTest extends TestCase
         $this->assertDatabaseHas('subtasks', ['id' => $subtask->id, 'status' => 'in_progress', 'progress_note' => 'Started work.']);
     }
 
+    public function test_assigned_coordinator_can_submit_project_for_review(): void
+    {
+        $admin = $this->makeAdmin();
+        $coordinator = $this->makeCoordinator('submit-project-coordinator@example.com');
+        $project = Project::factory()->create(['status' => 'in_progress', 'submitted_at' => null]);
+        $this->assignCoordinator($project, $coordinator, $admin);
+
+        $this->actingAs($coordinator)
+            ->post(route('projects.submit-for-review', $project))
+            ->assertRedirect(route('projects.show', $project));
+
+        $project->refresh();
+        $this->assertSame('submitted', $project->status);
+        $this->assertNotNull($project->submitted_at);
+        $this->assertNull($project->completed_at);
+    }
+
+    public function test_unassigned_coordinator_and_subordinate_cannot_submit_project_for_review(): void
+    {
+        $coordinator = $this->makeCoordinator('blocked-submit-project@example.com');
+        $subordinate = $this->makeSubordinate('blocked-submit-subordinate@example.com');
+        $project = Project::factory()->create(['status' => 'in_progress']);
+
+        $this->actingAs($coordinator)
+            ->post(route('projects.submit-for-review', $project))
+            ->assertForbidden();
+
+        $this->actingAs($subordinate)
+            ->post(route('projects.submit-for-review', $project))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('projects', ['id' => $project->id, 'status' => 'in_progress']);
+    }
+
+    public function test_pm_can_mark_submitted_project_completed_without_auto_completion(): void
+    {
+        $pm = $this->makePm('pm-complete-submitted@example.com');
+        $project = Project::factory()->create(['created_by' => $pm->id, 'status' => 'submitted', 'submitted_at' => now(), 'completed_at' => null]);
+
+        $this->actingAs($pm)
+            ->patch(route('projects.update', $project), [
+                'title' => $project->title,
+                'description' => $project->description,
+                'department_id' => $project->department_id,
+                'status' => 'completed',
+                'priority' => $project->priority,
+                'start_date' => $project->start_date?->format('Y-m-d'),
+                'deadline' => $project->deadline?->format('Y-m-d'),
+            ])
+            ->assertRedirect(route('projects.show', $project));
+
+        $this->assertDatabaseHas('projects', ['id' => $project->id, 'status' => 'completed']);
+    }
     public function test_required_visible_task_and_subtask_ui_texts_are_present(): void
     {
         $admin = $this->makeAdmin();
@@ -485,4 +538,3 @@ class TaskSubtaskWorkflowTest extends TestCase
         return $user;
     }
 }
-

@@ -27,7 +27,8 @@ class ProjectStatusTest extends TestCase
     public function test_due_eligible_statuses_exclude_closed_statuses(): void
     {
         $this->assertSame(['completed', 'archived', 'cancelled'], ProjectStatus::closedStatuses());
-        $this->assertSame(['planned', 'in_progress', 'submitted', 'active'], ProjectStatus::dueEligibleStatuses());
+        $this->assertSame(['planned', 'in_progress', 'active'], ProjectStatus::dueEligibleStatuses());
+        $this->assertSame(['planned', 'in_progress', 'active'], ProjectStatus::deadlineOpenStatuses());
         $this->assertEmpty(array_intersect(ProjectStatus::dueEligibleStatuses(), ProjectStatus::closedStatuses()));
     }
 

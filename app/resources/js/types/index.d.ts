@@ -47,6 +47,7 @@ export type Project = {
     priority?: string | null;
     start_date?: string | null;
     deadline?: string | null;
+    submitted_at?: string | null;
     department?: Department | null;
     creator?: BaseUser | null;
     active_primary_assignment?: { coordinator?: BaseUser | null } | null;
@@ -114,4 +115,3 @@ export type RepositoryEntry = {
     finalized_by_name?: string | null;
     final_status_snapshot?: Record<string, unknown> | null;
 };
-

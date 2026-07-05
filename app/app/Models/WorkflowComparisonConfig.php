@@ -39,16 +39,16 @@ class WorkflowComparisonConfig extends Model
 
     public function requirements(): HasMany
     {
-        return $this->hasMany(WorkflowRequirement::class);
+        return $this->hasMany(WorkflowRequirement::class, 'comparison_config_id');
     }
 
     public function deliverables(): HasMany
     {
-        return $this->hasMany(WorkflowDeliverable::class);
+        return $this->hasMany(WorkflowDeliverable::class, 'comparison_config_id');
     }
 
     public function results(): HasMany
     {
-        return $this->hasMany(WorkflowComparisonResult::class);
+        return $this->hasMany(WorkflowComparisonResult::class, 'comparison_config_id');
     }
 }

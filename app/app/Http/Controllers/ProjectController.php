@@ -148,6 +148,7 @@ class ProjectController extends Controller
         $alreadyFinalized = RepositoryEntry::where('project_id', $project->id)
             ->whereNotNull('finalized_at')
             ->first();
+        $canSubmitForReview = $user->can('submitForReview', $project);
         $canFinalizeProject = $canUpdateProject
             && $user->can('create repository entry')
             && $project->status === 'completed'
@@ -168,6 +169,8 @@ class ProjectController extends Controller
             'canAssignCoordinator' => $canAssignCoordinator,
             'canUpdateProject' => $canUpdateProject,
             'canFinalizeProject' => $canFinalizeProject,
+            'canSubmitForReview' => $canSubmitForReview,
+            'submitForReviewUrl' => $canSubmitForReview ? route('projects.submit-for-review', $project) : null,
             'alreadyFinalized' => $alreadyFinalized
                 ? [
                     'id' => $alreadyFinalized->id,
@@ -201,14 +204,33 @@ class ProjectController extends Controller
     {
         $this->authorize('update', $project);
 
-        $changes = array_keys(array_diff_assoc($request->validated(), $project->getOriginal()));
-        $project->update($request->validated());
+        $validated = $request->validated();
+        $changes = array_keys(array_diff_assoc($validated, $project->getOriginal()));
+
+        if (($validated['status'] ?? null) === 'submitted' && $project->status !== 'submitted' && $project->submitted_at === null) {
+            $validated['submitted_at'] = now();
+        }
+
+        $project->update($validated);
 
         $this->audit->logProjectUpdated($project, ['fields' => $changes]);
 
         return redirect()->route('projects.show', $project)->with('status', 'Project updated successfully.');
     }
 
+    public function submitForReview(Project $project): RedirectResponse
+    {
+        $this->authorize('submitForReview', $project);
+
+        $project->update([
+            'status' => 'submitted',
+            'submitted_at' => $project->submitted_at ?? now(),
+        ]);
+
+        $this->audit->logProjectUpdated($project, ['fields' => ['status', 'submitted_at']]);
+
+        return redirect()->route('projects.show', $project)->with('status', 'Project submitted for PM/Admin review.');
+    }
     public function editCoordinatorAssignment(Project $project): Response
     {
         $this->authorize('assignCoordinator', $project);
@@ -498,8 +520,3 @@ class ProjectController extends Controller
         app(WorkflowNotificationService::class)->notifyFileUploaded($file);
     }
 }
-
-
-
-
-

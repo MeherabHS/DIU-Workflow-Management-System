@@ -57,6 +57,26 @@ class ProjectPolicy
         return false;
     }
 
+    public function submitForReview(User $user, Project $project): bool
+    {
+        if (! in_array($project->status, ['planned', 'in_progress', 'active'], true)) {
+            return false;
+        }
+
+        if ($user->hasAnyRole(['Admin', 'PM/Manager']) && $user->can('update project')) {
+            return true;
+        }
+
+        if (! $user->hasRole('Coordinator') || ! $user->can('view assigned projects')) {
+            return false;
+        }
+
+        return $project->assignments()
+            ->where('assignment_role', 'primary')
+            ->whereNull('revoked_at')
+            ->where('coordinator_id', $user->id)
+            ->exists();
+    }
     public function assignCoordinator(User $user, Project $project): bool
     {
         return $user->can('assign coordinator');
