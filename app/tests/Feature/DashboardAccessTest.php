@@ -252,4 +252,78 @@ class DashboardAccessTest extends TestCase
                 ->has('projectStatuses', 10)
                 ->where('projectStatuses.0.title', 'Priority project 11'));
     }
+
+    public function test_admin_dashboard_project_status_filter_payload_includes_required_status_rows_without_changing_kpis(): void
+    {
+        $admin = User::factory()->create();
+        $admin->syncRoles(['Admin']);
+
+        $future = now()->addDay()->toDateString();
+        $past = now()->subDay()->toDateString();
+
+        $inProgress = Project::factory()->create(['title' => 'Filter in progress', 'status' => 'in_progress', 'priority' => 'low', 'deadline' => $future]);
+        $submitted = Project::factory()->create(['title' => 'Filter submitted', 'status' => 'submitted', 'priority' => 'low', 'deadline' => $future]);
+        $completed = Project::factory()->create(['title' => 'Filter completed', 'status' => 'completed', 'priority' => 'low', 'deadline' => $past]);
+        $due = Project::factory()->create(['title' => 'Filter due planned', 'status' => 'planned', 'priority' => 'low', 'deadline' => $future]);
+        $overdue = Project::factory()->create(['title' => 'Filter overdue', 'status' => 'in_progress', 'priority' => 'low', 'deadline' => $past]);
+        $active = Project::factory()->create(['title' => 'Filter legacy active', 'status' => 'active', 'priority' => 'low', 'deadline' => $future]);
+        $archived = Project::factory()->create(['title' => 'Filter archived excluded', 'status' => 'archived', 'priority' => 'low', 'deadline' => $past]);
+        $cancelled = Project::factory()->create(['title' => 'Filter cancelled excluded', 'status' => 'cancelled', 'priority' => 'low', 'deadline' => $past]);
+
+        $expectedIds = collect([$overdue, $inProgress, $submitted, $completed, $due, $active])->pluck('id')->sort()->values()->all();
+
+        $this->actingAs($admin)
+            ->get('/admin/dashboard')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Dashboards/Admin')
+                ->where('kpis.0.label', 'In Progress')
+                ->where('kpis.0.value', 3)
+                ->where('kpis.1.label', 'Completed')
+                ->where('kpis.1.value', 1)
+                ->where('kpis.2.label', 'Due')
+                ->where('kpis.2.value', 4)
+                ->where('kpis.3.label', 'Overdue')
+                ->where('kpis.3.value', 1)
+                ->where('kpis.4.label', 'Total Projects')
+                ->where('kpis.4.value', 4)
+                ->where('dashboardProjectStatuses', function ($rows) use ($expectedIds, $overdue, $archived, $cancelled) {
+                    $rows = collect($rows);
+                    $actualIds = $rows->pluck('id')->sort()->values()->all();
+
+                    return $actualIds === $expectedIds
+                        && $rows->firstWhere('id', $overdue->id)['is_overdue'] === true
+                        && ! $rows->contains('id', $archived->id)
+                        && ! $rows->contains('id', $cancelled->id);
+                }));
+    }
+
+    public function test_pm_dashboard_project_status_filter_payload_remains_scoped_to_owned_projects(): void
+    {
+        $pm = User::factory()->create();
+        $pm->syncRoles(['PM/Manager']);
+
+        $owned = Project::factory()->create([
+            'created_by' => $pm->id,
+            'title' => 'Owned dashboard status project',
+            'status' => 'completed',
+            'priority' => 'low',
+        ]);
+        $other = Project::factory()->create([
+            'title' => 'Unowned dashboard status project',
+            'status' => 'completed',
+            'priority' => 'low',
+        ]);
+
+        $this->actingAs($pm)
+            ->get('/pm/dashboard')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Dashboards/PM')
+                ->where('dashboardProjectStatuses', function ($rows) use ($owned, $other) {
+                    $ids = collect($rows)->pluck('id');
+
+                    return $ids->contains($owned->id) && ! $ids->contains($other->id);
+                }));
+    }
 }

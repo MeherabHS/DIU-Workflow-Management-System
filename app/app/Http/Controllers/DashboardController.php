@@ -173,35 +173,31 @@ class DashboardController extends Controller
 
         $projects = $projectQuery->orderBy('deadline')->orderBy('created_at', 'desc')->limit(100)->get();
 
-        $projectStatuses = $projects->map(function ($p) use ($now, $priorityOrder, $doneStatuses) {
-            $isOverdue = $p->deadline && $p->deadline->toDateString() < $now && ! in_array($p->status, $doneStatuses, true);
-
-            return [
-                'id' => $p->id,
-                'title' => $p->title,
-                'status' => $p->status,
-                'priority' => $p->priority,
-                'coordinator' => $p->activePrimaryAssignment?->coordinator?->name,
-                'department' => $p->department?->name,
-                'deadline' => $p->deadline?->format('Y-m-d'),
-                'is_overdue' => $isOverdue,
-                'priority_rank' => $priorityOrder[$p->priority] ?? 99,
-            ];
-        });
+        $projectStatuses = $this->dashboardProjectStatusRows($projects, $now, $priorityOrder, $doneStatuses);
 
         // Sort: overdue first, then priority rank (urgent > high > medium), then nearest deadline
-        $projectStatuses = $projectStatuses->sort(function ($a, $b) {
-            // Overdue first
-            if ($a['is_overdue'] !== $b['is_overdue']) {
-                return $b['is_overdue'] <=> $a['is_overdue'];
-            }
-            // Priority rank
-            if ($a['priority_rank'] !== $b['priority_rank']) {
-                return $a['priority_rank'] <=> $b['priority_rank'];
-            }
-            // Nearest deadline
-            return ($a['deadline'] ?? '9999-12-31') <=> ($b['deadline'] ?? '9999-12-31');
-        })->take(10)->values()->all();
+        $projectStatuses = $this->sortDashboardProjectStatuses($projectStatuses)->take(10)->values()->all();
+
+        $dashboardProjectQuery = Project::query()
+            ->with(['department', 'activePrimaryAssignment.coordinator'])
+            ->whereIn('status', array_values(array_unique([
+                ...ProjectStatus::totalProjectKpiStatuses(),
+                ...ProjectStatus::dueEligibleStatuses(),
+            ])));
+
+        if ($scopedProjectIds !== null) {
+            $dashboardProjectQuery->whereIn('id', $scopedProjectIds);
+        }
+
+        $dashboardProjectStatusProjects = $dashboardProjectQuery
+            ->orderBy('deadline')
+            ->orderBy('created_at', 'desc')
+            ->limit(100)
+            ->get();
+
+        $dashboardProjectStatuses = $this->sortDashboardProjectStatuses(
+            $this->dashboardProjectStatusRows($dashboardProjectStatusProjects, $now, $priorityOrder, $doneStatuses)
+        )->values()->all();
 
         // Status donut: completed vs in-progress project counts
         $inProgressProjects = Project::query()
@@ -243,9 +239,45 @@ class DashboardController extends Controller
         return [
             'kpis' => $kpis,
             'projectStatuses' => $projectStatuses,
+            'dashboardProjectStatuses' => $dashboardProjectStatuses,
             'statusData' => $statusData,
             'completionByMonth' => $completionByMonth,
         ];
+    }
+
+    protected function dashboardProjectStatusRows(Collection $projects, string $now, array $priorityOrder, array $doneStatuses): Collection
+    {
+        return $projects->map(function ($p) use ($now, $priorityOrder, $doneStatuses) {
+            $isOverdue = $p->deadline && $p->deadline->toDateString() < $now && ! in_array($p->status, $doneStatuses, true);
+
+            return [
+                'id' => $p->id,
+                'title' => $p->title,
+                'status' => $p->status,
+                'priority' => $p->priority,
+                'coordinator' => $p->activePrimaryAssignment?->coordinator?->name,
+                'department' => $p->department?->name,
+                'deadline' => $p->deadline?->format('Y-m-d'),
+                'is_overdue' => $isOverdue,
+                'priority_rank' => $priorityOrder[$p->priority] ?? 99,
+            ];
+        });
+    }
+
+    protected function sortDashboardProjectStatuses(Collection $projectStatuses): Collection
+    {
+        return $projectStatuses->sort(function ($a, $b) {
+            // Overdue first
+            if ($a['is_overdue'] !== $b['is_overdue']) {
+                return $b['is_overdue'] <=> $a['is_overdue'];
+            }
+            // Priority rank
+            if ($a['priority_rank'] !== $b['priority_rank']) {
+                return $a['priority_rank'] <=> $b['priority_rank'];
+            }
+            // Nearest deadline
+            return ($a['deadline'] ?? '9999-12-31') <=> ($b['deadline'] ?? '9999-12-31');
+        });
     }
 
     protected function dashboardLinks(): array
@@ -322,4 +354,3 @@ class DashboardController extends Controller
         ]);
     }
 }
-

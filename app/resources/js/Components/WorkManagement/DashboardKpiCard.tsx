@@ -1,4 +1,12 @@
-export default function DashboardKpiCard({ label, value, color = 'blue' }: { label: string; value: number; color?: string }) {
+type DashboardKpiCardProps = {
+    label: string;
+    value: number;
+    color?: string;
+    active?: boolean;
+    onClick?: () => void;
+};
+
+export default function DashboardKpiCard({ label, value, color = 'blue', active = false, onClick }: DashboardKpiCardProps) {
     const colorMap: Record<string, string> = {
         green: 'border-green-200 bg-green-50',
         blue: 'border-blue-200 bg-blue-50',
@@ -17,9 +25,19 @@ export default function DashboardKpiCard({ label, value, color = 'blue' }: { lab
     };
     const bg = colorMap[color] ?? colorMap.blue;
     const vc = valueColor[color] ?? valueColor.blue;
+    const className = `rounded-xl border ${bg} p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${active ? 'ring-2 ring-blue-500 ring-offset-2' : ''} ${onClick ? 'cursor-pointer hover:shadow-sm' : ''}`;
+
+    if (onClick) {
+        return (
+            <button type="button" className={className} onClick={onClick} aria-pressed={active}>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
+                <p className={`mt-1 text-3xl font-bold ${vc}`}>{value}</p>
+            </button>
+        );
+    }
 
     return (
-        <div className={`rounded-xl border ${bg} p-4`}>
+        <div className={className}>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
             <p className={`mt-1 text-3xl font-bold ${vc}`}>{value}</p>
         </div>
