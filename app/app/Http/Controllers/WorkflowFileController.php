@@ -132,7 +132,7 @@ class WorkflowFileController extends Controller
         $fileService = app(WorkflowFileService::class);
         $validated = $request->validate([
             ...$fileService->validationRules(),
-            'file_category' => ['nullable', 'string', Rule::in(['attachment', 'evidence', 'reference', 'repository_document', 'feedback_attachment', 'requirement'])],
+            'file_category' => ['nullable', 'string', Rule::in(['attachment', 'requirement', 'deliverable', 'evidence', 'other', 'reference', 'repository_document', 'feedback_attachment'])],
             'description' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -179,4 +179,5 @@ class WorkflowFileController extends Controller
         ]);
     }
 }
+
 

@@ -84,7 +84,8 @@ class RequirementDeliverableComparisonTest extends TestCase
                 'completion_percentage' => 0,
                 'items' => [],
             ])
-            ->assertJsonPath('summary', 'No requirement files uploaded yet. Upload a requirement file (PDF, DOCX, TXT, CSV, XLSX) with category "requirement".');
+            ->assertJsonPath('summary', 'No requirement file has been uploaded yet. Upload a file with category Requirement.')
+            ->assertJsonPath('expected_items', []);
     }
 
     public function test_project_show_page_receives_configured_comparison_state_without_running_json_endpoint(): void
@@ -438,6 +439,107 @@ class RequirementDeliverableComparisonTest extends TestCase
         $this->assertStringContainsString('workflow-files/', $storedFile->path);
     }
 
+    public function test_project_comparison_detects_requirement_file_but_waits_for_deliverable_or_evidence(): void
+    {
+        Config::set('ai_comparison.enabled', true);
+        Config::set('ai_comparison.api_key', 'test-key');
+        Storage::fake('local');
+
+        $admin = $this->makeAdmin();
+        $project = Project::factory()->create();
+
+        $file = WorkflowFile::create([
+            'project_id' => $project->id,
+            'uploaded_by' => $admin->id,
+            'original_name' => 'chairman-requirement.txt',
+            'stored_name' => 'chairman-requirement.txt',
+            'disk' => 'local',
+            'path' => 'workflow-files/2026/07/chairman-requirement.txt',
+            'mime_type' => 'text/plain',
+            'size' => 100,
+            'file_category' => 'requirement',
+        ]);
+        Storage::disk('local')->put($file->path, 'Collect departmental records and prepare repository inventory.');
+
+        $this->actingAs($admin)
+            ->postJson(route('projects.comparison.run', $project))
+            ->assertOk()
+            ->assertJsonPath('status', 'no_deliverables')
+            ->assertJsonPath('summary', 'Requirement file found, but no deliverable or evidence file has been uploaded yet.');
+    }
+
+    public function test_project_comparison_detects_deliverable_category_and_returns_structured_ai_summary(): void
+    {
+        Config::set('ai_comparison.enabled', true);
+        Config::set('ai_comparison.api_key', 'test-key');
+        Config::set('ai_comparison.base_url', 'https://api.test.com/v1');
+        Config::set('ai_comparison.model', 'test-model');
+        Storage::fake('local');
+
+        Http::fakeSequence()
+            ->push(['choices' => [['message' => ['content' => json_encode([
+                ['text' => 'Collect departmental records'],
+                ['text' => 'Prepare repository inventory'],
+            ])]]]], 200)
+            ->push(['choices' => [['message' => ['content' => json_encode([
+                ['text' => 'Some records collected'],
+                ['text' => 'Draft inventory started'],
+            ])]]]], 200)
+            ->push(['choices' => [['message' => ['content' => json_encode([
+                'summary' => 'The submitted progress note partially satisfies the requirement.',
+                'completion_percentage' => 45,
+                'status' => 'partially_completed',
+                'expected_items' => ['Collect departmental records', 'Prepare repository inventory'],
+                'completed_items' => ['Some records collected'],
+                'partial_items' => ['Draft inventory started'],
+                'pending_items' => ['Final repository inventory'],
+                'recommendations' => ['Complete verification and submit final inventory.'],
+                'items' => [[
+                    'requirement' => 'Collect departmental records',
+                    'status' => 'partially_completed',
+                    'matched_deliverable' => 'Some records collected',
+                    'notes' => 'Collection has started but is incomplete.',
+                ]],
+            ])]]]], 200);
+
+        $admin = $this->makeAdmin();
+        $project = Project::factory()->create();
+
+        foreach ([
+            ['chairman-requirement.txt', 'requirement', 'Collect departmental records and prepare repository inventory.'],
+            ['registrar-progress.txt', 'deliverable', 'Some records collected and a draft inventory started.'],
+        ] as [$name, $category, $contents]) {
+            $file = WorkflowFile::create([
+                'project_id' => $project->id,
+                'uploaded_by' => $admin->id,
+                'original_name' => $name,
+                'stored_name' => $name,
+                'disk' => 'local',
+                'path' => 'workflow-files/2026/07/'.$name,
+                'mime_type' => 'text/plain',
+                'size' => strlen($contents),
+                'file_category' => $category,
+            ]);
+            Storage::disk('local')->put($file->path, $contents);
+        }
+
+        $this->actingAs($admin)
+            ->postJson(route('projects.comparison.run', $project))
+            ->assertOk()
+            ->assertJsonPath('status', 'partially_completed')
+            ->assertJsonPath('summary', 'The submitted progress note partially satisfies the requirement.')
+            ->assertJsonPath('completion_percentage', 45)
+            ->assertJsonPath('expected_items.0', 'Collect departmental records')
+            ->assertJsonPath('completed_items.0', 'Some records collected')
+            ->assertJsonPath('partial_items.0', 'Draft inventory started')
+            ->assertJsonPath('pending_items.0', 'Final repository inventory')
+            ->assertJsonPath('recommendations.0', 'Complete verification and submit final inventory.');
+
+        $this->assertDatabaseHas('workflow_comparison_results', [
+            'status' => 'partially_completed',
+            'summary' => 'The submitted progress note partially satisfies the requirement.',
+        ]);
+    }
     // Helpers
 
     protected function makeAdmin(?string $email = null): User
@@ -553,3 +655,5 @@ class RequirementDeliverableComparisonTest extends TestCase
         return $content;
     }
 }
+
+

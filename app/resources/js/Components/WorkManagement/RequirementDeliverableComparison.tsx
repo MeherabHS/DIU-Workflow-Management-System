@@ -1,18 +1,23 @@
 import axios, { AxiosError } from 'axios';
 import { useState } from 'react';
 
-type ComparisonItem = {
+export type ComparisonItem = {
     requirement: string;
     status: string;
     matched_deliverable: string | null;
     notes: string;
 };
 
-type ComparisonResult = {
+export type ComparisonResult = {
     status: string;
     completion_percentage: number;
     summary: string | null;
     items: ComparisonItem[];
+    expected_items?: string[];
+    completed_items?: string[];
+    partial_items?: string[];
+    pending_items?: string[];
+    recommendations?: string[];
     error_message: string | null;
     created_at: string | null;
 };
@@ -26,6 +31,7 @@ type ComparisonRunResponse = Partial<ComparisonResult> & {
 const statusBadgeClass: Record<string, string> = {
     completed: 'bg-green-100 text-green-800',
     partially_completed: 'bg-yellow-100 text-yellow-800',
+    partial: 'bg-yellow-100 text-yellow-800',
     missing: 'bg-red-100 text-red-800',
     unclear: 'bg-gray-100 text-gray-800',
     config_missing: 'bg-gray-100 text-gray-800',
@@ -42,6 +48,7 @@ const statusBadgeClass: Record<string, string> = {
 const statusLabel: Record<string, string> = {
     completed: 'Completed',
     partially_completed: 'Partially Completed',
+    partial: 'Partially Completed',
     missing: 'Missing',
     unclear: 'Unclear',
     config_missing: 'Not Configured',
@@ -49,17 +56,24 @@ const statusLabel: Record<string, string> = {
     failed: 'Failed',
     error: 'Error',
     no_requirements: 'No Requirements',
-    no_deliverables: 'No Deliverables',
+    no_deliverables: 'Awaiting Deliverables',
     no_completion: 'No Completion',
     extraction_failed: 'Extraction Failed',
     pending: 'Pending',
 };
 
-const normalizeComparisonResult = (data: ComparisonRunResponse): ComparisonResult => ({
+const toStringArray = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim() !== '') : [];
+
+export const normalizeComparisonResult = (data: ComparisonRunResponse): ComparisonResult => ({
     status: data.status ?? 'error',
     completion_percentage: Number(data.completion_percentage ?? 0),
     summary: data.summary ?? data.message ?? null,
     items: Array.isArray(data.items) ? data.items : [],
+    expected_items: toStringArray(data.expected_items),
+    completed_items: toStringArray(data.completed_items),
+    partial_items: toStringArray(data.partial_items),
+    pending_items: toStringArray(data.pending_items),
+    recommendations: toStringArray(data.recommendations),
     error_message: data.error_message ?? (Array.isArray(data.errors) ? data.errors.join(' ') : null),
     created_at: data.created_at ?? null,
 });
@@ -87,6 +101,28 @@ const requestErrorMessage = (error: unknown): string => {
 
     return axiosError.response?.data?.message ?? axiosError.response?.data?.error ?? 'Comparison failed. Please try again.';
 };
+
+function ListSection({ title, items, tone = 'gray' }: { title: string; items?: string[]; tone?: 'green' | 'yellow' | 'red' | 'gray' }) {
+    if (!items?.length) return null;
+
+    const markerClass = {
+        green: 'bg-green-500',
+        yellow: 'bg-yellow-500',
+        red: 'bg-red-500',
+        gray: 'bg-gray-400',
+    }[tone];
+
+    return (
+        <div className="rounded-lg border border-gray-200 bg-white p-3">
+            <h3 className="text-xs font-semibold uppercase text-gray-500">{title}</h3>
+            <ul className="mt-2 space-y-2">
+                {items.map((item) => (
+                    <li key={item} className="flex gap-2 text-sm text-gray-700"><span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${markerClass}`} />{item}</li>
+                ))}
+            </ul>
+        </div>
+    );
+}
 
 export default function RequirementDeliverableComparison({
     isConfigured,
@@ -184,12 +220,22 @@ export default function RequirementDeliverableComparison({
                 />
             </div>
 
-            {currentResult.summary && <p className="mt-3 text-sm text-gray-700">{currentResult.summary}</p>}
+            <div className="mt-4 rounded-lg border border-gray-200 bg-white p-3">
+                <h3 className="text-sm font-semibold text-gray-950">AI Summary</h3>
+                <p className="mt-1 text-sm text-gray-700">{currentResult.summary || 'Run AI comparison after uploading requirement and deliverable/evidence files.'}</p>
+            </div>
 
             {error && <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
             {currentResult.error_message && (
                 <p className="mt-3 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm text-orange-700">{currentResult.error_message}</p>
             )}
+
+            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                <ListSection title="Completed Items" items={currentResult.completed_items} tone="green" />
+                <ListSection title="Partially Completed Items" items={currentResult.partial_items} tone="yellow" />
+                <ListSection title="Pending Items" items={currentResult.pending_items} tone="red" />
+                <ListSection title="Recommendations" items={currentResult.recommendations} tone="gray" />
+            </div>
 
             {currentResult.items.length > 0 && (
                 <div className="mt-4 space-y-2">
@@ -227,3 +273,4 @@ export default function RequirementDeliverableComparison({
         </section>
     );
 }
+

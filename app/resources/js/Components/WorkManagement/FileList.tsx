@@ -12,15 +12,24 @@ type FileListProps = {
     title?: string;
 };
 
+const fileCategoryOptions = [
+    { value: 'requirement', label: 'Requirement' },
+    { value: 'deliverable', label: 'Deliverable' },
+    { value: 'evidence', label: 'Evidence' },
+    { value: 'other', label: 'Other' },
+];
+
 export default function FileList({ files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 100, title = 'Attachments' }: FileListProps) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [uploading, setUploading] = useState(false);
+    const [fileCategory, setFileCategory] = useState('other');
 
     function uploadFile(file: File | null | undefined) {
         if (!file || !fileUploadUrl) return;
 
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('file_category', fileCategory);
 
         setUploading(true);
         router.post(fileUploadUrl, formData, {
@@ -35,7 +44,7 @@ export default function FileList({ files = [], canUploadFile = false, fileUpload
 
     return (
         <section className="mt-6">
-            <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <h2 className="inline-flex items-center gap-2 text-base font-semibold text-gray-950">
                     <Paperclip className="h-4 w-4" />
                     {title} ({files.length})
@@ -43,12 +52,24 @@ export default function FileList({ files = [], canUploadFile = false, fileUpload
                 {canUploadFile && fileUploadUrl && (
                     <>
                         <input ref={inputRef} type="file" accept={allowedFileTypes} className="hidden" onChange={(event) => uploadFile(event.target.files?.[0])} />
-                        <div className="flex flex-col items-end gap-1">
+                        <div className="flex flex-col items-start gap-2 md:items-end">
+                            <label className="flex items-center gap-2 text-xs font-medium text-gray-600">
+                                File Category
+                                <select
+                                    value={fileCategory}
+                                    onChange={(event) => setFileCategory(event.target.value)}
+                                    className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-900 focus:border-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+                                >
+                                    {fileCategoryOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                </select>
+                            </label>
                             <button type="button" disabled={uploading} onClick={() => inputRef.current?.click()} className="inline-flex items-center gap-1 text-sm font-semibold text-gray-900 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-60">
                                 <Upload className="h-3.5 w-3.5" />
                                 {uploading ? 'Uploading' : 'Upload'}
                             </button>
-                            <span className="text-xs text-gray-500">Maximum file size: {maxFileSizeMb}MB</span>
+                            <span className="max-w-xs text-left text-xs text-gray-500 md:text-right">AI comparison requires at least one Requirement file and one Deliverable/Evidence file. Maximum file size: {maxFileSizeMb}MB</span>
                         </div>
                     </>
                 )}
@@ -69,4 +90,3 @@ export default function FileList({ files = [], canUploadFile = false, fileUpload
         </section>
     );
 }
-

@@ -18,6 +18,21 @@ function metaText(file: WorkflowFile) {
     return [file.size_human, file.uploaded_by_name ? `Uploaded by ${file.uploaded_by_name}` : null].filter(Boolean).join(' - ');
 }
 
+function categoryLabel(category?: string | null) {
+    const labels: Record<string, string> = {
+        requirement: 'Requirement',
+        deliverable: 'Deliverable',
+        evidence: 'Evidence',
+        other: 'Other',
+        attachment: 'Attachment',
+        reference: 'Reference',
+        repository_document: 'Repository',
+        feedback_attachment: 'Feedback',
+    };
+
+    return labels[category || 'attachment'] ?? 'Attachment';
+}
+
 export default function FileCard({ file }: { file: WorkflowFile }) {
     function destroy() {
         if (!file.delete_url) return;
@@ -28,7 +43,10 @@ export default function FileCard({ file }: { file: WorkflowFile }) {
         <div className="flex items-center gap-3 rounded-lg border border-gray-200 p-3 hover:bg-gray-50">
             <FileText className="h-8 w-8 shrink-0 text-gray-900" />
             <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-gray-900" title={file.original_name}>{file.original_name}</p>
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <p className="truncate text-sm font-medium text-gray-900" title={file.original_name}>{file.original_name}</p>
+                    <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-semibold text-gray-700">{categoryLabel(file.file_category)}</span>
+                </div>
                 <p className="truncate text-xs text-gray-500">{metaText(file)}</p>
             </div>
             <div className="flex shrink-0 items-center gap-1">

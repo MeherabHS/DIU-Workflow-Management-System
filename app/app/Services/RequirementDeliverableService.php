@@ -10,7 +10,6 @@ use App\Models\WorkflowComparisonResult;
 use App\Models\WorkflowDeliverable;
 use App\Models\WorkflowFile;
 use App\Models\WorkflowRequirement;
-use Illuminate\Support\Facades\DB;
 
 class RequirementDeliverableService
 {
@@ -25,27 +24,21 @@ class RequirementDeliverableService
      */
     public function processComparison(Project|Task|Subtask $context): array
     {
-        // Check if AI is configured
         if (! $this->aiService->isConfigured()) {
             return $this->storeConfigMissingResult($context);
         }
 
-        // Get or create comparison config
         $config = $this->getOrCreateConfig($context);
-
-        // Get requirement files (file_category = 'requirement')
         $requirementFiles = $this->getRequirementFiles($context);
-
-        // Get deliverable files (file_category = 'evidence')
         $deliverableFiles = $this->getDeliverableFiles($context);
 
         if (empty($requirementFiles)) {
             return [
                 'isConfigured' => true,
                 'status' => 'no_requirements',
-                'summary' => 'No requirement files uploaded yet. Upload a requirement file (PDF, DOCX, TXT, CSV, XLSX) with category "requirement".',
+                'summary' => 'No requirement file has been uploaded yet. Upload a file with category Requirement.',
                 'completion_percentage' => 0,
-                'items' => [],
+                ...$this->emptyStructuredFields(),
             ];
         }
 
@@ -53,13 +46,12 @@ class RequirementDeliverableService
             return [
                 'isConfigured' => true,
                 'status' => 'no_deliverables',
-                'summary' => 'No deliverable/evidence files uploaded yet. Upload evidence files to compare against requirements.',
+                'summary' => 'Requirement file found, but no deliverable or evidence file has been uploaded yet.',
                 'completion_percentage' => 0,
-                'items' => [],
+                ...$this->emptyStructuredFields(),
             ];
         }
 
-        // Extract text from requirement files
         $requirements = [];
         $extractionErrors = [];
 
@@ -82,13 +74,12 @@ class RequirementDeliverableService
 
             foreach ($extracted as $req) {
                 if (isset($req['text'])) {
-                    $requirement = WorkflowRequirement::create([
+                    $requirements[] = WorkflowRequirement::create([
                         'comparison_config_id' => $config->id,
                         'workflow_file_id' => $file->id,
                         'requirement_text' => $req['text'],
                         'source_page' => $req['page'] ?? null,
                     ]);
-                    $requirements[] = $requirement;
                 }
             }
         }
@@ -100,11 +91,10 @@ class RequirementDeliverableService
                 'summary' => 'Could not extract requirements from uploaded files.',
                 'errors' => $extractionErrors,
                 'completion_percentage' => 0,
-                'items' => [],
+                ...$this->emptyStructuredFields(),
             ];
         }
 
-        // Extract text from deliverable files
         $deliverables = [];
 
         foreach ($deliverableFiles as $file) {
@@ -125,18 +115,16 @@ class RequirementDeliverableService
 
             foreach ($extracted as $del) {
                 if (isset($del['text'])) {
-                    $deliverable = WorkflowDeliverable::create([
+                    $deliverables[] = WorkflowDeliverable::create([
                         'comparison_config_id' => $config->id,
                         'workflow_file_id' => $file->id,
                         'deliverable_text' => $del['text'],
                         'source_page' => $del['page'] ?? null,
                     ]);
-                    $deliverables[] = $deliverable;
                 }
             }
         }
 
-        // Compare requirements vs deliverables
         $reqData = collect($requirements)->map(fn ($r) => ['text' => $r->requirement_text, 'page' => $r->source_page])->all();
         $delData = collect($deliverables)->map(fn ($d) => ['text' => $d->deliverable_text, 'page' => $d->source_page])->all();
 
@@ -169,6 +157,7 @@ class RequirementDeliverableService
             'completion_percentage' => (float) $latestResult->completion_percentage,
             'summary' => $latestResult->summary,
             'items' => $latestResult->matched_items ?? [],
+            ...$this->structuredFieldsFromResult($latestResult),
             'error_message' => $latestResult->error_message,
             'created_at' => $latestResult->created_at?->diffForHumans(),
         ];
@@ -240,16 +229,18 @@ class RequirementDeliverableService
 
     protected function getDeliverableFiles(Project|Task|Subtask $context): array
     {
+        $categories = ['deliverable', 'evidence', 'attachment'];
+
         if ($context instanceof Subtask) {
             return WorkflowFile::where('subtask_id', $context->id)
-                ->whereIn('file_category', ['evidence', 'attachment'])
+                ->whereIn('file_category', $categories)
                 ->orderBy('created_at')
                 ->get()
                 ->all();
         }
         if ($context instanceof Task) {
             return WorkflowFile::where('task_id', $context->id)
-                ->whereIn('file_category', ['evidence', 'attachment'])
+                ->whereIn('file_category', $categories)
                 ->orderBy('created_at')
                 ->get()
                 ->all();
@@ -258,7 +249,7 @@ class RequirementDeliverableService
         return WorkflowFile::where('project_id', $context->id)
             ->whereNull('task_id')
             ->whereNull('subtask_id')
-            ->whereIn('file_category', ['evidence', 'attachment'])
+            ->whereIn('file_category', $categories)
             ->orderBy('created_at')
             ->get()
             ->all();
@@ -268,7 +259,7 @@ class RequirementDeliverableService
     {
         $config = $this->getOrCreateConfig($context);
 
-        $result = WorkflowComparisonResult::create([
+        WorkflowComparisonResult::create([
             'comparison_config_id' => $config->id,
             'status' => 'config_missing',
             'completion_percentage' => 0,
@@ -280,13 +271,13 @@ class RequirementDeliverableService
             'status' => 'config_missing',
             'summary' => 'AI comparison not configured. Add AI credentials to .env to enable.',
             'completion_percentage' => 0,
-            'items' => [],
+            ...$this->emptyStructuredFields(),
         ];
     }
 
     protected function storeFailedResult(WorkflowComparisonConfig $config, array $aiResponse): array
     {
-        $result = WorkflowComparisonResult::create([
+        WorkflowComparisonResult::create([
             'comparison_config_id' => $config->id,
             'status' => 'failed',
             'completion_percentage' => 0,
@@ -300,7 +291,7 @@ class RequirementDeliverableService
             'status' => 'failed',
             'summary' => 'Comparison failed: ' . ($aiResponse['error'] ?? 'Unknown error'),
             'completion_percentage' => 0,
-            'items' => [],
+            ...$this->emptyStructuredFields(),
             'error_message' => $aiResponse['error'] ?? 'Unknown error',
         ];
     }
@@ -311,13 +302,14 @@ class RequirementDeliverableService
         $completionPercentage = $aiResponse['completion_percentage'] ?? 0;
         $summary = $aiResponse['summary'] ?? '';
 
-        // Determine overall status from items
         $statuses = collect($items)->pluck('status')->filter();
-        $overallStatus = 'partially_completed';
-        if ($statuses->every(fn ($s) => $s === 'completed')) {
-            $overallStatus = 'completed';
-        } elseif ($statuses->every(fn ($s) => in_array($s, ['missing', 'unclear']))) {
-            $overallStatus = 'missing';
+        $overallStatus = $aiResponse['status'] ?? 'partially_completed';
+        if ($statuses->isNotEmpty()) {
+            if ($statuses->every(fn ($s) => $s === 'completed')) {
+                $overallStatus = 'completed';
+            } elseif ($statuses->every(fn ($s) => in_array($s, ['missing', 'unclear'], true))) {
+                $overallStatus = 'missing';
+            }
         }
 
         $result = WorkflowComparisonResult::create([
@@ -336,8 +328,71 @@ class RequirementDeliverableService
             'summary' => $summary,
             'completion_percentage' => (float) $completionPercentage,
             'items' => $items,
+            ...$this->structuredFields($aiResponse, $items),
             'error_message' => ! empty($extractionErrors) ? implode('; ', $extractionErrors) : null,
             'created_at' => $result->created_at?->diffForHumans(),
         ];
+    }
+
+    protected function emptyStructuredFields(): array
+    {
+        return [
+            'items' => [],
+            'expected_items' => [],
+            'completed_items' => [],
+            'partial_items' => [],
+            'pending_items' => [],
+            'recommendations' => [],
+        ];
+    }
+
+    protected function structuredFieldsFromResult(WorkflowComparisonResult $result): array
+    {
+        $raw = is_string($result->raw_ai_response) ? json_decode($result->raw_ai_response, true) : null;
+
+        return $this->structuredFields(is_array($raw) ? $raw : [], $result->matched_items ?? []);
+    }
+
+    protected function structuredFields(array $aiResponse, array $items): array
+    {
+        $expectedItems = $this->stringList($aiResponse['expected_items'] ?? []);
+        if (empty($expectedItems)) {
+            $expectedItems = collect($items)
+                ->pluck('requirement')
+                ->filter(fn ($value) => is_string($value) && trim($value) !== '')
+                ->values()
+                ->all();
+        }
+
+        return [
+            'expected_items' => $expectedItems,
+            'completed_items' => $this->stringList($aiResponse['completed_items'] ?? $this->itemsByStatus($items, ['completed'])),
+            'partial_items' => $this->stringList($aiResponse['partial_items'] ?? $this->itemsByStatus($items, ['partially_completed', 'partial'])),
+            'pending_items' => $this->stringList($aiResponse['pending_items'] ?? $this->itemsByStatus($items, ['missing', 'unclear'])),
+            'recommendations' => $this->stringList($aiResponse['recommendations'] ?? []),
+        ];
+    }
+
+    protected function itemsByStatus(array $items, array $statuses): array
+    {
+        return collect($items)
+            ->filter(fn ($item) => is_array($item) && in_array($item['status'] ?? null, $statuses, true))
+            ->map(fn ($item) => $item['requirement'] ?? $item['matched_deliverable'] ?? null)
+            ->filter(fn ($value) => is_string($value) && trim($value) !== '')
+            ->values()
+            ->all();
+    }
+
+    protected function stringList(mixed $values): array
+    {
+        if (! is_array($values)) {
+            return [];
+        }
+
+        return collect($values)
+            ->map(fn ($value) => is_string($value) ? trim($value) : null)
+            ->filter()
+            ->values()
+            ->all();
     }
 }

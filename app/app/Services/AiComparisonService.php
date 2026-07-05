@@ -56,14 +56,25 @@ PROMPT;
 
         $prompt = <<<'PROMPT'
 Compare the following requirements against the deliverables.
+Requirements may be unstructured letters or memos. Deliverables may be partial reports, evidence notes, or progress files.
+Infer implied major requirements when the requirement text is not written as a checklist.
 For each requirement, determine if it is:
 - "completed": the deliverable fully satisfies the requirement
 - "partially_completed": the deliverable partially satisfies the requirement
 - "missing": no deliverable addresses this requirement
 - "unclear": cannot determine if the requirement is met from the deliverable
+Do not mark 100% complete unless every major requirement is clearly satisfied by evidence.
 
 Return ONLY a valid JSON object with this exact structure:
 {
+  "summary": "short overall summary (2-3 sentences)",
+  "completion_percentage": 0.00,
+  "status": "completed|partially_completed|missing|unclear",
+  "expected_items": ["requirement item inferred from the requirement file"],
+  "completed_items": ["requirement/evidence item that is clearly complete"],
+  "partial_items": ["requirement/evidence item that is partly satisfied"],
+  "pending_items": ["missing, incomplete, or review-needed item"],
+  "recommendations": ["practical next step"],
   "items": [
     {
       "requirement": "requirement text",
@@ -71,9 +82,7 @@ Return ONLY a valid JSON object with this exact structure:
       "matched_deliverable": "matched deliverable text or null",
       "notes": "brief explanation"
     }
-  ],
-  "completion_percentage": 0.00,
-  "summary": "short overall summary (2-3 sentences)"
+  ]
 }
 
 Requirements:
@@ -160,3 +169,4 @@ PROMPT;
         return null;
     }
 }
+

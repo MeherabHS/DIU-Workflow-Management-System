@@ -554,6 +554,44 @@ class WorkflowFileTest extends TestCase
             ->where('allowedFileTypes', $expected)
             ->where('maxFileSizeMb', 100));
     }
+    public function test_project_file_upload_accepts_ai_comparison_categories(): void
+    {
+        $admin = $this->makeAdmin('admin-ai-file-categories@example.com');
+        $project = Project::factory()->create();
+
+        foreach (['requirement', 'deliverable', 'evidence', 'other'] as $category) {
+            $this->actingAs($admin)->post(route('projects.files.store', $project), $this->uploadPayload([
+                'file' => UploadedFile::fake()->create($category.'.txt', 1, 'text/plain'),
+                'file_category' => $category,
+            ]))->assertRedirect();
+
+            $this->assertDatabaseHas('workflow_files', [
+                'project_id' => $project->id,
+                'original_name' => $category.'.txt',
+                'file_category' => $category,
+            ]);
+        }
+    }
+
+    public function test_attachment_components_expose_category_selector_badge_and_ai_helper_text(): void
+    {
+        $fileList = file_get_contents(resource_path('js/Components/WorkManagement/FileList.tsx'));
+        $fileCard = file_get_contents(resource_path('js/Components/WorkManagement/FileCard.tsx'));
+        $projectShow = file_get_contents(resource_path('js/Pages/Projects/Show.tsx'));
+        $progressComparison = file_get_contents(resource_path('js/Components/WorkManagement/ProgressComparison.tsx'));
+
+        $this->assertStringContainsString("formData.append('file_category', fileCategory)", $fileList);
+        $this->assertStringContainsString('File Category', $fileList);
+        $this->assertStringContainsString('Requirement', $fileList);
+        $this->assertStringContainsString('Deliverable', $fileList);
+        $this->assertStringContainsString('Evidence', $fileList);
+        $this->assertStringContainsString('AI comparison requires at least one Requirement file and one Deliverable/Evidence file.', $fileList);
+        $this->assertStringContainsString('categoryLabel(file.file_category)', $fileCard);
+        $this->assertStringContainsString('Attachment', $fileCard);
+        $this->assertStringContainsString('<ProgressComparison result={comparisonResult} />', $projectShow);
+        $this->assertStringNotContainsString("['Project setup', 'Task planning', 'Delivery review']", $projectShow);
+        $this->assertStringContainsString('Run AI comparison after uploading requirement and deliverable/evidence files.', $progressComparison);
+    }
     protected function uploadPayload(array $overrides = []): array
     {
         return $overrides + [
@@ -640,6 +678,8 @@ class WorkflowFileTest extends TestCase
         return $user;
     }
 }
+
+
 
 
 
