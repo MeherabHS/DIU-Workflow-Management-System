@@ -73,37 +73,12 @@ class ComparisonController extends Controller
     {
         $user = request()->user();
 
-        // Admin and PM/Manager can access any project's comparison
         if ($user->hasAnyRole(['Admin', 'PM/Manager'])) {
             return;
-        }
-
-        // Coordinator can access comparison for assigned projects/tasks/subtasks
-        if ($user->hasRole('Coordinator')) {
-            $project = $context instanceof Project ? $context : ($context instanceof Task ? $context->project : $context->project);
-            $isAssigned = $project->assignments()
-                ->where('coordinator_id', $user->id)
-                ->where('assignment_role', 'primary')
-                ->whereNull('revoked_at')
-                ->exists();
-
-            if ($isAssigned) {
-                return;
-            }
-        }
-
-        // Subordinate can access comparison only for assigned subtasks
-        if ($user->hasRole('Subordinate') && $context instanceof Subtask) {
-            $isAssigned = $context->assignments()
-                ->where('subordinate_id', $user->id)
-                ->whereNull('revoked_at')
-                ->exists();
-
-            if ($isAssigned) {
-                return;
-            }
         }
 
         abort(403, 'Unauthorized to view comparison.');
     }
 }
+
+

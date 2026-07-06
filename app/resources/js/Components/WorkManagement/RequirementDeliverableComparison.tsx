@@ -140,6 +140,10 @@ export default function RequirementDeliverableComparison({
     const [currentResult, setCurrentResult] = useState<ComparisonResult | null>(result);
     const [isAiConfigured, setIsAiConfigured] = useState(isConfigured);
 
+    if (!runUrl) {
+        return null;
+    }
+
     async function runComparison() {
         if (!runUrl) {
             setError('Comparison is not available for this item.');
@@ -273,4 +277,6 @@ export default function RequirementDeliverableComparison({
         </section>
     );
 }
+
+
 

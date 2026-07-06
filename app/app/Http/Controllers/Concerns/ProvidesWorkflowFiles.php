@@ -152,6 +152,10 @@ trait ProvidesWorkflowFiles
 
     protected function comparisonProps(Project|Task|Subtask $context, User $user): array
     {
+        if (! $user->hasAnyRole(['Admin', 'PM/Manager'])) {
+            return ['comparisonResult' => null, 'isComparisonConfigured' => false, 'comparisonRunUrl' => null, 'comparisonClearUrl' => null];
+        }
+
         $service = app(RequirementDeliverableService::class);
         $isConfigured = $service->isAiConfigured();
 
@@ -185,6 +189,9 @@ trait ProvidesWorkflowFiles
         ];
     }
 }
+
+
+
 
 
 

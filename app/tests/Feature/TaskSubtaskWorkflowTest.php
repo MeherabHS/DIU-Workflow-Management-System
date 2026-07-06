@@ -165,6 +165,8 @@ class TaskSubtaskWorkflowTest extends TestCase
         $admin = $this->makeAdmin();
         $coordinator = $this->makeCoordinator('create-work-item-coordinator@example.com');
         $subordinate = $this->makeSubordinate('create-work-item-subordinate@example.com');
+        $inactiveSubordinate = $this->makeSubordinate('inactive-subordinate-list@example.com');
+        $inactiveSubordinate->update(['is_active' => false]);
         $project = Project::factory()->create();
         $this->assignCoordinator($project, $coordinator, $admin);
         $task = Task::factory()->for($project)->create();
@@ -173,7 +175,8 @@ class TaskSubtaskWorkflowTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Subtasks/Form')
-                ->where('assignableSubordinates', fn ($users): bool => collect($users)->pluck('id')->contains($subordinate->id)));
+                ->where('assignableSubordinates', fn ($users): bool => collect($users)->pluck('id')->contains($subordinate->id)
+                    && ! collect($users)->pluck('id')->contains($inactiveSubordinate->id)));
 
         $this->actingAs($coordinator)->post(route('tasks.subtasks.store', $task), $this->subtaskPayload([
             'title' => 'Assigned during creation',
@@ -206,6 +209,8 @@ class TaskSubtaskWorkflowTest extends TestCase
         $coordinator = $this->makeCoordinator();
         $blockedCoordinator = $this->makeCoordinator('blocked-assign@example.com');
         $subordinate = $this->makeSubordinate();
+        $inactiveSubordinate = $this->makeSubordinate('inactive-assignment@example.com');
+        $inactiveSubordinate->update(['is_active' => false]);
         $project = Project::factory()->create();
         $this->assignCoordinator($project, $coordinator, $admin);
         $task = Task::factory()->for($project)->create();
@@ -215,6 +220,7 @@ class TaskSubtaskWorkflowTest extends TestCase
 
         $this->actingAs($admin)->post(route('subtasks.assign-subordinate.store', $subtask), ['subordinate_id' => $subordinate->id])->assertForbidden();
         $this->actingAs($pm)->post(route('subtasks.assign-subordinate.store', $otherSubtask), ['subordinate_id' => $subordinate->id])->assertForbidden();
+        $this->actingAs($coordinator)->post(route('subtasks.assign-subordinate.store', $thirdSubtask), ['subordinate_id' => $inactiveSubordinate->id])->assertSessionHasErrors('subordinate_id');
         $this->actingAs($coordinator)->post(route('subtasks.assign-subordinate.store', $thirdSubtask), ['subordinate_id' => $subordinate->id])->assertRedirect();
         $this->actingAs($blockedCoordinator)->post(route('subtasks.assign-subordinate.store', $subtask), ['subordinate_id' => $subordinate->id])->assertForbidden();
 
@@ -538,3 +544,6 @@ class TaskSubtaskWorkflowTest extends TestCase
         return $user;
     }
 }
+
+
+

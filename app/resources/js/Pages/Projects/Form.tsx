@@ -5,9 +5,15 @@ import { Head, useForm } from '@inertiajs/react';
 import { Paperclip } from 'lucide-react';
 import { useRef } from 'react';
 
-export default function Form({ project, departments = [], statuses = [], pageTitle, submitLabel, method, action, allowedFileTypes, maxFileSizeMb = 10 }: { project: Project; departments: Department[]; statuses: string[]; pageTitle: string; submitLabel: string; method: 'post' | 'patch'; action: string; allowedFileTypes?: string; maxFileSizeMb?: number }) {
+type CoordinatorUser = {
+    id: number;
+    name: string;
+    email?: string | null;
+};
+
+export default function Form({ project, departments = [], statuses = [], coordinatorUsers = [], pageTitle, submitLabel, method, action, allowedFileTypes, maxFileSizeMb = 10 }: { project: Project; departments: Department[]; statuses: string[]; coordinatorUsers?: CoordinatorUser[]; pageTitle: string; submitLabel: string; method: 'post' | 'patch'; action: string; allowedFileTypes?: string; maxFileSizeMb?: number }) {
     const inputRef = useRef<HTMLInputElement>(null);
-    const { data, setData, post, patch, processing, errors } = useForm<{ title: string; description: string; department_id: string; status: string; priority: string; start_date: string; deadline: string; file: File | null }>({
+    const { data, setData, post, patch, processing, errors } = useForm<{ title: string; description: string; department_id: string; status: string; priority: string; start_date: string; deadline: string; coordinator_id: string; file: File | null }>({
         title: project.title || '',
         description: project.description || '',
         department_id: String(project.department?.id || ''),
@@ -15,6 +21,7 @@ export default function Form({ project, departments = [], statuses = [], pageTit
         priority: project.priority || 'medium',
         start_date: project.start_date?.slice(0, 10) || '',
         deadline: project.deadline?.slice(0, 10) || '',
+        coordinator_id: '',
         file: null,
     });
 
@@ -48,6 +55,17 @@ export default function Form({ project, departments = [], statuses = [], pageTit
                             <select value={data.status} onChange={(event) => setData('status', event.target.value)} className="mt-1 w-full rounded-lg border-gray-300 shadow-sm">{statuses.map((status) => <option key={status} value={status}>{status}</option>)}</select>
                         </div>
                     </div>
+                    {method === 'post' && (
+                        <div>
+                            <label className="text-sm font-semibold">Assign Coordinator</label>
+                            <select value={data.coordinator_id} onChange={(event) => setData('coordinator_id', event.target.value)} className="mt-1 w-full rounded-lg border-gray-300 shadow-sm">
+                                <option value="">Select Coordinator</option>
+                                {coordinatorUsers.map((user) => <option key={user.id} value={user.id}>{user.name}{user.email ? ` (${user.email})` : ''}</option>)}
+                            </select>
+                            {coordinatorUsers.length === 0 && <p className="mt-1 text-sm text-gray-500">No active Coordinator users available.</p>}
+                            {errors.coordinator_id && <p className="mt-1 text-sm text-red-600">{errors.coordinator_id}</p>}
+                        </div>
+                    )}
                     <div className="grid gap-4 md:grid-cols-3">
                         <div>
                             <label className="text-sm font-semibold">Priority</label>
@@ -84,5 +102,3 @@ export default function Form({ project, departments = [], statuses = [], pageTit
         </AuthenticatedLayout>
     );
 }
-
-

@@ -35,3 +35,4 @@ class AssignCoordinatorRequest extends FormRequest
         ];
     }
 }
+

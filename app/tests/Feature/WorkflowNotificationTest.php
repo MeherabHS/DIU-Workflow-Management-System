@@ -710,6 +710,37 @@ class WorkflowNotificationTest extends TestCase
         ]);
     }
 
+    public function test_project_creation_with_coordinator_notifies_assigned_coordinator(): void
+    {
+        $pm = $this->makePm('pm-create-assignment-notify@example.com');
+        $coordinator = $this->makeCoordinator('coord-create-assignment-notify@example.com');
+
+        $this->actingAs($pm)
+            ->post(route('projects.store'), [
+                'title' => 'Notification On Create Assignment',
+                'status' => 'planned',
+                'coordinator_id' => $coordinator->id,
+            ])
+            ->assertRedirect();
+
+        $project = Project::where('title', 'Notification On Create Assignment')->firstOrFail();
+
+        $this->assertDatabaseHas('workflow_notifications', [
+            'user_id' => $coordinator->id,
+            'actor_id' => $pm->id,
+            'project_id' => $project->id,
+            'type' => 'coordinator_assigned',
+            'title' => 'New Project Assigned',
+            'body' => "You have been assigned to project: {$project->title}",
+            'action_url' => '/projects/'.$project->id,
+        ]);
+
+        $this->assertDatabaseMissing('workflow_notifications', [
+            'user_id' => $pm->id,
+            'project_id' => $project->id,
+            'type' => 'coordinator_assigned',
+        ]);
+    }
     public function test_project_coordinator_reassignment_notifies_new_and_old_coordinators(): void
     {
         $admin = $this->makeAdmin('admin-reassign@example.com');
@@ -872,6 +903,7 @@ class WorkflowNotificationTest extends TestCase
         return $user;
     }
 }
+
 
 
 

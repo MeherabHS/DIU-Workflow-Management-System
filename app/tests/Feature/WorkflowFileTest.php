@@ -77,6 +77,43 @@ class WorkflowFileTest extends TestCase
         $this->actingAs($coordinator)->get(route('workflow-files.download', WorkflowFile::firstOrFail()))->assertOk();
     }
 
+    public function test_assigned_coordinator_can_download_pm_uploaded_project_requirement_file(): void
+    {
+        $admin = $this->makeAdmin('admin-pm-project-file-access@example.com');
+        $pm = $this->makePm('pm-project-file-access@example.com');
+        $coordinator = $this->makeCoordinator('coord-project-file-access@example.com');
+        $project = Project::factory()->create();
+        $this->assignCoordinator($project, $coordinator, $admin);
+
+        $file = $this->makeWorkflowFile($project, $pm, 'pm-requirement.pdf', 'requirement');
+
+        $this->actingAs($coordinator)->get(route('workflow-files.download', $file))->assertOk();
+    }
+
+    public function test_assigned_coordinator_can_download_pm_uploaded_task_file_under_assigned_project(): void
+    {
+        $admin = $this->makeAdmin('admin-pm-task-file-access@example.com');
+        $pm = $this->makePm('pm-task-file-access@example.com');
+        $coordinator = $this->makeCoordinator('coord-task-file-access@example.com');
+        $project = Project::factory()->create();
+        $task = Task::factory()->for($project)->create();
+        $this->assignCoordinator($project, $coordinator, $admin);
+
+        $file = $this->makeWorkflowFile($task, $pm, 'pm-task-instructions.pdf', 'requirement');
+
+        $this->actingAs($coordinator)->get(route('workflow-files.download', $file))->assertOk();
+    }
+
+    public function test_coordinator_cannot_download_pm_uploaded_file_from_unassigned_project(): void
+    {
+        $pm = $this->makePm('pm-unassigned-file-access@example.com');
+        $coordinator = $this->makeCoordinator('coord-unassigned-file-access@example.com');
+        $project = Project::factory()->create();
+
+        $file = $this->makeWorkflowFile($project, $pm, 'pm-unassigned-requirement.pdf', 'requirement');
+
+        $this->actingAs($coordinator)->get(route('workflow-files.download', $file))->assertForbidden();
+    }
     public function test_unassigned_coordinator_cannot_upload_or_download_under_another_project(): void
     {
         $admin = $this->makeAdmin();
@@ -609,7 +646,8 @@ class WorkflowFileTest extends TestCase
         $this->assertStringContainsString('categoryLabel(file.file_category)', $fileCard);
         $this->assertStringContainsString('Follow-up', $fileCard);
         $this->assertStringContainsString('Attachment', $fileCard);
-        $this->assertStringContainsString('<ProgressComparison result={comparisonResult} />', $projectShow);
+        $this->assertStringContainsString('RequirementDeliverableComparison', $projectShow);
+        $this->assertStringNotContainsString('<ProgressComparison result={comparisonResult} />', $projectShow);
         $this->assertStringNotContainsString("['Project setup', 'Task planning', 'Delivery review']", $projectShow);
         $this->assertStringContainsString('Run AI comparison after uploading requirement and deliverable/evidence files.', $progressComparison);
     }
@@ -640,7 +678,7 @@ class WorkflowFileTest extends TestCase
         ];
     }
 
-    protected function makeWorkflowFile(Project|Task|Subtask|RepositoryEntry $context, User $uploader, string $name = 'evidence.pdf'): WorkflowFile
+    protected function makeWorkflowFile(Project|Task|Subtask|RepositoryEntry $context, User $uploader, string $name = 'evidence.pdf', string $category = 'attachment'): WorkflowFile
     {
         $path = 'workflow-files/2026/06/'.uniqid('file_', true).'.pdf';
         Storage::disk('local')->put($path, 'phase 9 evidence');
@@ -660,7 +698,7 @@ class WorkflowFileTest extends TestCase
             'path' => $path,
             'mime_type' => 'application/pdf',
             'size' => 16,
-            'file_category' => 'attachment',
+            'file_category' => $category,
         ]);
     }
 
@@ -719,6 +757,10 @@ class WorkflowFileTest extends TestCase
         return $user;
     }
 }
+
+
+
+
 
 
 

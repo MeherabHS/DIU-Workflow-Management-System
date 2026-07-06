@@ -24,11 +24,13 @@ class AssignSubordinateRequest extends FormRequest
                 function (string $attribute, mixed $value, Closure $fail): void {
                     $subordinate = User::query()->find($value);
 
-                    if (! $subordinate?->hasRole('Subordinate')) {
-                        $fail('The selected user must have the Subordinate role.');
+                    if (! $subordinate?->is_active || ! $subordinate->hasRole('Subordinate')) {
+                        $fail('The selected user must be an active Subordinate user.');
                     }
                 },
             ],
         ];
     }
 }
+
+

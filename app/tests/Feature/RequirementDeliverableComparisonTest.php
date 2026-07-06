@@ -359,7 +359,7 @@ class RequirementDeliverableComparisonTest extends TestCase
             ->assertOk();
     }
 
-    public function test_role_visibility_coordinator_can_view_assigned(): void
+    public function test_role_visibility_coordinator_cannot_view_assigned_comparison(): void
     {
         $admin = $this->makeAdmin();
         $coordinator = $this->makeCoordinator('coord-comparison@example.com');
@@ -368,10 +368,10 @@ class RequirementDeliverableComparisonTest extends TestCase
 
         $this->actingAs($coordinator)
             ->getJson(route('projects.comparison.show', $project))
-            ->assertOk();
+            ->assertForbidden();
     }
 
-    public function test_role_visibility_subordinate_can_view_assigned_subtask(): void
+    public function test_role_visibility_subordinate_cannot_view_assigned_subtask_comparison(): void
     {
         $admin = $this->makeAdmin();
         $subordinate = $this->makeSubordinate('sub-comparison@example.com');
@@ -380,7 +380,7 @@ class RequirementDeliverableComparisonTest extends TestCase
 
         $this->actingAs($subordinate)
             ->getJson(route('subtasks.comparison.show', $subtask))
-            ->assertOk();
+            ->assertForbidden();
     }
 
     public function test_unrelated_user_cannot_view_result(): void
@@ -668,6 +668,7 @@ class RequirementDeliverableComparisonTest extends TestCase
         return $content;
     }
 }
+
 
 
 

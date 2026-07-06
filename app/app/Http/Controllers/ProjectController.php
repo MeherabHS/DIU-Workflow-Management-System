@@ -94,9 +94,10 @@ class ProjectController extends Controller
 
         $validated = $request->validated();
         $uploadedFile = $validated['file'] ?? null;
-        unset($validated['file']);
+        $coordinatorId = $validated['coordinator_id'] ?? null;
+        unset($validated['file'], $validated['coordinator_id']);
 
-        $project = DB::transaction(function () use ($request, $validated, $uploadedFile) {
+        $project = DB::transaction(function () use ($request, $validated, $uploadedFile, $coordinatorId) {
             $project = Project::create([
                 ...$validated,
                 'created_by' => $request->user()->id,
@@ -118,6 +119,10 @@ class ProjectController extends Controller
             if ($uploadedFile) {
                 $this->authorize('create', [WorkflowFile::class, $project]);
                 $this->storeInitialProjectFile($request, $project, $uploadedFile);
+            }
+
+            if ($coordinatorId) {
+                $this->assignCoordinatorOnCreate($request, $project, (int) $coordinatorId);
             }
 
             $this->audit->logProjectCreated($project);
@@ -496,7 +501,35 @@ class ProjectController extends Controller
             'statuses' => $this->statuses(),
             'allowedFileTypes' => app(WorkflowFileService::class)->acceptAttribute(),
             'maxFileSizeMb' => app(WorkflowFileService::class)->maxUploadMegabytes(),
+            'coordinatorUsers' => $this->coordinatorUsers(),
         ];
+    }
+
+
+    protected function coordinatorUsers(): \Illuminate\Database\Eloquent\Collection
+    {
+        return User::role('Coordinator')
+            ->where('is_active', true)
+            ->select('id', 'name', 'email')
+            ->orderBy('name')
+            ->orderBy('email')
+            ->get();
+    }
+
+    protected function assignCoordinatorOnCreate(Request $request, Project $project, int $coordinatorId): void
+    {
+        ProjectAssignment::create([
+            'project_id' => $project->id,
+            'coordinator_id' => $coordinatorId,
+            'assigned_by' => $request->user()->id,
+            'assignment_role' => 'primary',
+            'assigned_at' => now(),
+            'revoked_at' => null,
+        ]);
+
+        $coordinator = User::findOrFail($coordinatorId);
+        app(WorkflowNotificationService::class)->notifyCoordinatorAssigned($project, $coordinator, $request->user());
+        $this->audit->logCoordinatorAssigned($project, $coordinator, $request->user());
     }
 
     protected function statuses(): array
@@ -520,3 +553,5 @@ class ProjectController extends Controller
         app(WorkflowNotificationService::class)->notifyFileUploaded($file);
     }
 }
+
+

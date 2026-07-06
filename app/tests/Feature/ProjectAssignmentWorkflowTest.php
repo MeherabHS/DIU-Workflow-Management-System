@@ -478,6 +478,82 @@ class ProjectAssignmentWorkflowTest extends TestCase
                 ->where('canAssignCoordinator', true)
                 ->where('actions.2', 'Assign Coordinator'));
     }
+    public function test_project_create_page_lists_only_active_coordinators(): void
+    {
+        $admin = $this->makeAdmin('admin-create-coordinator-list@example.com');
+        $activeCoordinator = $this->makeCoordinator('active-create-coordinator@example.com');
+        $inactiveCoordinator = $this->makeCoordinator('inactive-create-coordinator@example.com');
+        $inactiveCoordinator->update(['is_active' => false]);
+        $subordinate = $this->makeSubordinate('subordinate-not-coordinator@example.com');
+        $noRole = User::factory()->create(['email' => 'no-role-create-project@example.com', 'is_active' => true]);
+        $noRole->syncRoles([]);
+
+        $response = $this->actingAs($admin)->get(route('projects.create'))->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page->component('Projects/Form'));
+
+        $coordinatorIds = collect($response->inertiaProps('coordinatorUsers'))->pluck('id');
+
+        $this->assertTrue($coordinatorIds->contains($activeCoordinator->id));
+        $this->assertFalse($coordinatorIds->contains($inactiveCoordinator->id));
+        $this->assertFalse($coordinatorIds->contains($subordinate->id));
+        $this->assertFalse($coordinatorIds->contains($noRole->id));
+    }
+
+    public function test_pm_can_create_project_with_coordinator_assignment(): void
+    {
+        $pm = $this->makePm('pm-create-with-coordinator@example.com');
+        $coordinator = $this->makeCoordinator('coord-create-with-project@example.com');
+
+        $this->actingAs($pm)->post(route('projects.store'), [
+            'title' => 'Project Created With Coordinator',
+            'status' => 'planned',
+            'coordinator_id' => $coordinator->id,
+        ])->assertRedirect();
+
+        $project = Project::where('title', 'Project Created With Coordinator')->firstOrFail();
+
+        $this->assertDatabaseHas('project_assignments', [
+            'project_id' => $project->id,
+            'coordinator_id' => $coordinator->id,
+            'assigned_by' => $pm->id,
+            'assignment_role' => 'primary',
+            'revoked_at' => null,
+        ]);
+
+        $this->actingAs($coordinator)->get(route('projects.show', $project))->assertOk();
+    }
+
+    public function test_pm_cannot_assign_subordinate_during_project_creation(): void
+    {
+        $pm = $this->makePm('pm-create-with-subordinate@example.com');
+        $subordinate = $this->makeSubordinate('sub-create-not-coordinator@example.com');
+
+        $this->actingAs($pm)->post(route('projects.store'), [
+            'title' => 'Invalid Coordinator Project',
+            'status' => 'planned',
+            'coordinator_id' => $subordinate->id,
+        ])->assertSessionHasErrors('coordinator_id');
+    }
+
+    public function test_invalid_coordinator_id_on_project_creation_returns_validation_error(): void
+    {
+        $admin = $this->makeAdmin('admin-invalid-coordinator-id@example.com');
+
+        $this->actingAs($admin)->post(route('projects.store'), [
+            'title' => 'Invalid Coordinator Id Project',
+            'status' => 'planned',
+            'coordinator_id' => 999999,
+        ])->assertSessionHasErrors('coordinator_id');
+    }
+
+    public function test_project_show_keeps_ai_comparison_and_removes_redundant_progress_report(): void
+    {
+        $projectShow = file_get_contents(resource_path('js/Pages/Projects/Show.tsx'));
+
+        $this->assertStringContainsString('RequirementDeliverableComparison', $projectShow);
+        $this->assertStringNotContainsString('ProgressComparison', $projectShow);
+        $this->assertStringNotContainsString('Run AI comparison after uploading requirement and deliverable/evidence files.', $projectShow);
+    }
     protected function makeAdmin(?string $email = null): User
     {
         $user = User::factory()->create(['email' => $email ?? fake()->unique()->safeEmail()]);
@@ -510,4 +586,6 @@ class ProjectAssignmentWorkflowTest extends TestCase
         return $user;
     }
 }
+
+
 

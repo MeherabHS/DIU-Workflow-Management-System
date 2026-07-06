@@ -27,11 +27,19 @@ class StoreSubtaskRequest extends FormRequest
                 'integer',
                 Rule::exists('users', 'id'),
                 function (string $attribute, mixed $value, Closure $fail): void {
-                    if ($value && ! User::query()->find($value)?->hasRole('Subordinate')) {
-                        $fail('The selected user must have the Subordinate role.');
+                    if (! $value) {
+                        return;
+                    }
+
+                    $subordinate = User::query()->find($value);
+
+                    if (! $subordinate?->is_active || ! $subordinate->hasRole('Subordinate')) {
+                        $fail('The selected user must be an active Subordinate user.');
                     }
                 },
             ],
         ];
     }
 }
+
+
