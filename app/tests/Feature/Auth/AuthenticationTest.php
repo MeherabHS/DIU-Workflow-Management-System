@@ -20,6 +20,53 @@ class AuthenticationTest extends TestCase
         $this->seed(RolePermissionSeeder::class);
     }
 
+
+    public function test_root_redirects_guest_to_login_without_laravel_welcome(): void
+    {
+        $response = $this->get('/');
+
+        $response->assertRedirect(route('login'));
+        $response->assertDontSee('Laravel News');
+        $response->assertDontSee('Laracasts');
+        $response->assertDontSee('Vibrant Ecosystem');
+    }
+
+    public function test_login_screen_contains_register_link(): void
+    {
+        $this->get('/login')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Auth/Login'));
+
+        $login = file_get_contents(resource_path('js/Pages/Auth/Login.tsx'));
+
+        $this->assertStringContainsString('Register', $login);
+        $this->assertStringContainsString("href={route('register')}", $login);
+    }
+
+    public function test_root_redirects_authenticated_roles_to_role_dashboard(): void
+    {
+        $admin = User::factory()->create(['email' => 'root-admin@example.com']);
+        $admin->syncRoles(['Admin']);
+        $this->actingAs($admin)->get('/')->assertRedirect(route('admin.dashboard'));
+
+        auth()->logout();
+
+        $pm = User::factory()->create(['email' => 'root-pm@example.com']);
+        $pm->syncRoles(['PM/Manager']);
+        $this->actingAs($pm)->get('/')->assertRedirect(route('pm.dashboard'));
+
+        auth()->logout();
+
+        $coordinator = User::factory()->create(['email' => 'root-coordinator@example.com']);
+        $coordinator->syncRoles(['Coordinator']);
+        $this->actingAs($coordinator)->get('/')->assertRedirect(route('coordinator.dashboard'));
+
+        auth()->logout();
+
+        $subordinate = User::factory()->create(['email' => 'root-subordinate@example.com']);
+        $subordinate->syncRoles(['Subordinate']);
+        $this->actingAs($subordinate)->get('/')->assertRedirect(route('subordinate.dashboard'));
+    }
     public function test_login_screen_can_be_rendered(): void
     {
         $response = $this->get('/login');
@@ -88,4 +135,5 @@ class AuthenticationTest extends TestCase
         $response->assertRedirect('/');
     }
 }
+
 

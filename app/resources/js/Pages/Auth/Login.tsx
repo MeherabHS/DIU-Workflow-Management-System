@@ -100,6 +100,13 @@ export default function Login({
                         </Link>
                     )}
 
+                    <Link
+                        href={route('register')}
+                        className="ms-4 rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                    >
+                        Register
+                    </Link>
+
                     <PrimaryButton className="ms-4" disabled={processing}>
                         Log in
                     </PrimaryButton>
@@ -108,3 +115,4 @@ export default function Login({
         </GuestLayout>
     );
 }
+

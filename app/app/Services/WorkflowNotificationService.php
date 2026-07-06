@@ -117,14 +117,17 @@ class WorkflowNotificationService
 
     public function notifySubordinateAssigned(Subtask $subtask, User $subordinate, User $actor): void
     {
+        $subtask->loadMissing('project');
+        $projectTitle = $subtask->project?->title ?? 'the project';
+
         $this->notifyUser($subordinate, [
             'actor_id' => $actor->id,
             'project_id' => $subtask->project_id,
             'task_id' => $subtask->task_id,
             'subtask_id' => $subtask->id,
             'type' => 'subordinate_assigned',
-            'title' => 'Assigned to Work Item',
-            'body' => "You have been assigned to work item: {$subtask->title}",
+            'title' => 'Work Item assigned',
+            'body' => "You have been assigned to {$subtask->title} under {$projectTitle}.",
             'action_url' => $this->relativeRoute('subtasks.mine.show', $subtask),
         ]);
     }
@@ -363,6 +366,7 @@ class WorkflowNotificationService
         return $recipients->unique('id');
     }
 }
+
 
 
 

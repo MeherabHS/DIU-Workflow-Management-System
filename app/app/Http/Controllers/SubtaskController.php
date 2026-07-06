@@ -151,15 +151,18 @@ class SubtaskController extends Controller
 
     protected function formData(Task $task, Subtask $subtask): array
     {
+        $subordinateUsers = User::role('Subordinate')
+            ->where('is_active', true)
+            ->select('id', 'name', 'email')
+            ->orderBy('name')
+            ->get();
+
         return [
             'task' => $task,
             'project' => $task->project,
             'subtask' => $subtask,
-            'assignableSubordinates' => User::role('Subordinate')
-                ->where('is_active', true)
-                ->select('id', 'name', 'email')
-                ->orderBy('name')
-                ->get(),
+            'subordinateUsers' => $subordinateUsers,
+            'assignableSubordinates' => $subordinateUsers,
             'statuses' => $this->statuses(),
         ];
     }
@@ -169,4 +172,5 @@ class SubtaskController extends Controller
         return ['pending', 'in_progress', 'submitted', 'approved', 'revision_required', 'completed', 'cancelled'];
     }
 }
+
 

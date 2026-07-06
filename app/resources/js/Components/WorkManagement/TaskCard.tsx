@@ -21,7 +21,7 @@ type CardProps = {
     className?: string;
 };
 
-function CardShell({ title, description, status, priority, dueDate, users = [], fileCount = 0, contextLine, actions = [], className }: CardProps) {
+function CardShell({ title, description, status, priority, dueDate, users, fileCount = 0, contextLine, actions = [], className }: CardProps) {
     return (
         <article className={cn('rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-all hover:shadow-lg', className)}>
             <div className="mb-3 flex items-start justify-between gap-3">
@@ -38,7 +38,7 @@ function CardShell({ title, description, status, priority, dueDate, users = [], 
             </div>
 
             <div className="flex items-center justify-between gap-3">
-                <AssignmentChips users={users} compact />
+                {users !== undefined && <AssignmentChips users={users} compact />}
                 <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-gray-500"><Paperclip className="h-3.5 w-3.5" />{fileCount}</span>
             </div>
 
@@ -56,3 +56,4 @@ function CardShell({ title, description, status, priority, dueDate, users = [], 
 }
 
 export default CardShell;
+

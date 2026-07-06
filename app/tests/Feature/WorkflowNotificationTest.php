@@ -84,6 +84,16 @@ class WorkflowNotificationTest extends TestCase
 
         $this->assertDatabaseHas('workflow_notifications', [
             'user_id' => $subordinate->id,
+            'actor_id' => $coordinator->id,
+            'type' => 'subordinate_assigned',
+            'subtask_id' => $subtask->id,
+            'title' => 'Work Item assigned',
+            'body' => "You have been assigned to {$subtask->title} under {$subtask->project->title}.",
+            'action_url' => '/my-subtasks/'.$subtask->id,
+        ]);
+
+        $this->assertDatabaseMissing('workflow_notifications', [
+            'user_id' => $coordinator->id,
             'type' => 'subordinate_assigned',
             'subtask_id' => $subtask->id,
         ]);
@@ -118,8 +128,11 @@ class WorkflowNotificationTest extends TestCase
 
         $this->assertDatabaseHas('workflow_notifications', [
             'user_id' => $subordinate->id,
+            'actor_id' => $coordinator->id,
             'type' => 'subordinate_assigned',
             'subtask_id' => $created->id,
+            'title' => 'Work Item assigned',
+            'body' => "You have been assigned to {$created->title} under {$task->project->title}.",
             'action_url' => '/my-subtasks/'.$created->id,
         ]);
     }
@@ -903,6 +916,7 @@ class WorkflowNotificationTest extends TestCase
         return $user;
     }
 }
+
 
 
 

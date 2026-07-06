@@ -16,19 +16,16 @@ use App\Http\Controllers\WorkflowMessageController;
 use App\Http\Controllers\WorkflowFileController;
 use App\Http\Controllers\WorkflowNotificationController;
 use App\Http\Controllers\ComparisonController;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
 Route::get('/health', HealthController::class)->name('health');
 
 Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
+    if (auth()->check()) {
+        return redirect()->route(DashboardController::homeRouteFor(auth()->user()));
+    }
+
+    return redirect()->route('login');
 });
 
 Route::middleware(['auth', 'verified'])->group(function (): void {
@@ -222,3 +219,5 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 });
 
 require __DIR__.'/auth.php';
+
+

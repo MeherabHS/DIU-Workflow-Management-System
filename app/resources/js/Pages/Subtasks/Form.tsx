@@ -3,7 +3,8 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { BaseUser, Project, Subtask, Task } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 
-export default function Form({ project, task, subtask, assignableSubordinates = [], statuses = [], pageTitle, submitLabel, method, action }: { project: Project; task: Task; subtask: Subtask; assignableSubordinates?: BaseUser[]; statuses: string[]; pageTitle: string; submitLabel: string; method: 'post' | 'patch'; action: string }) {
+export default function Form({ project, task, subtask, subordinateUsers = [], assignableSubordinates = [], statuses = [], pageTitle, submitLabel, method, action }: { project: Project; task: Task; subtask: Subtask; subordinateUsers?: BaseUser[]; assignableSubordinates?: BaseUser[]; statuses: string[]; pageTitle: string; submitLabel: string; method: 'post' | 'patch'; action: string }) {
+    const dropdownSubordinates = subordinateUsers.length > 0 ? subordinateUsers : assignableSubordinates;
     const { data, setData, post, patch, processing, errors } = useForm({
         title: subtask.title || '',
         description: subtask.description || '',
@@ -33,13 +34,14 @@ export default function Form({ project, task, subtask, assignableSubordinates = 
                         <label className="text-sm font-semibold text-gray-900">Description</label>
                         <textarea rows={4} value={data.description} onChange={(event) => setData('description', event.target.value)} className="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-gray-500 focus:ring-gray-500" />
                     </div>
-                    {method === 'post' && assignableSubordinates.length > 0 && (
+                    {method === 'post' && (
                         <div>
                             <label className="text-sm font-semibold text-gray-900">Assign Subordinate</label>
                             <select value={data.subordinate_id} onChange={(event) => setData('subordinate_id', event.target.value)} className="mt-1 w-full rounded-lg border-gray-300 shadow-sm">
                                 <option value="">Assign later</option>
-                                {assignableSubordinates.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+                                {dropdownSubordinates.map((user) => <option key={user.id} value={user.id}>{user.name}{user.email ? ` (${user.email})` : ''}</option>)}
                             </select>
+                            {dropdownSubordinates.length === 0 && <p className="mt-1 text-sm text-gray-500">No active Subordinate users available.</p>}
                             {errors.subordinate_id && <p className="mt-1 text-sm text-red-600">{errors.subordinate_id}</p>}
                         </div>
                     )}
@@ -67,3 +69,6 @@ export default function Form({ project, task, subtask, assignableSubordinates = 
         </AuthenticatedLayout>
     );
 }
+
+
+

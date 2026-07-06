@@ -167,6 +167,11 @@ class TaskSubtaskWorkflowTest extends TestCase
         $subordinate = $this->makeSubordinate('create-work-item-subordinate@example.com');
         $inactiveSubordinate = $this->makeSubordinate('inactive-subordinate-list@example.com');
         $inactiveSubordinate->update(['is_active' => false]);
+        $pmOnly = $this->makePm('pm-not-subordinate-create-work-item@example.com');
+        $adminOnly = $this->makeAdmin('admin-not-subordinate-create-work-item@example.com');
+        $coordinatorOnly = $this->makeCoordinator('coord-not-subordinate-create-work-item@example.com');
+        $noRole = User::factory()->create(['email' => 'pending-no-role-create-work-item@example.com', 'is_active' => true]);
+        $noRole->syncRoles([]);
         $project = Project::factory()->create();
         $this->assignCoordinator($project, $coordinator, $admin);
         $task = Task::factory()->for($project)->create();
@@ -175,8 +180,18 @@ class TaskSubtaskWorkflowTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Subtasks/Form')
+                ->where('subordinateUsers', fn ($users): bool => collect($users)->pluck('id')->contains($subordinate->id)
+                    && ! collect($users)->pluck('id')->contains($inactiveSubordinate->id)
+                    && ! collect($users)->pluck('id')->contains($pmOnly->id)
+                    && ! collect($users)->pluck('id')->contains($adminOnly->id)
+                    && ! collect($users)->pluck('id')->contains($coordinatorOnly->id)
+                    && ! collect($users)->pluck('id')->contains($noRole->id))
                 ->where('assignableSubordinates', fn ($users): bool => collect($users)->pluck('id')->contains($subordinate->id)
-                    && ! collect($users)->pluck('id')->contains($inactiveSubordinate->id)));
+                    && ! collect($users)->pluck('id')->contains($inactiveSubordinate->id)
+                    && ! collect($users)->pluck('id')->contains($pmOnly->id)
+                    && ! collect($users)->pluck('id')->contains($adminOnly->id)
+                    && ! collect($users)->pluck('id')->contains($coordinatorOnly->id)
+                    && ! collect($users)->pluck('id')->contains($noRole->id)));
 
         $this->actingAs($coordinator)->post(route('tasks.subtasks.store', $task), $this->subtaskPayload([
             'title' => 'Assigned during creation',
@@ -401,6 +416,14 @@ class TaskSubtaskWorkflowTest extends TestCase
                 ->component('MySubtasks/Show')
                 ->where('pageTitle', 'Work Item Details')
                 ->where('action', route('subtasks.mine.progress', $subtask)));
+        $taskShow = file_get_contents(resource_path('js/Pages/Tasks/Show.tsx'));
+        $subtaskForm = file_get_contents(resource_path('js/Pages/Subtasks/Form.tsx'));
+
+        $this->assertStringNotContainsString("label: 'Assigned To'", $taskShow);
+        $this->assertStringNotContainsString('<AssignmentChips users={assigned}', $taskShow);
+        $this->assertStringContainsString('Subordinates are assigned at Work Item level.', $taskShow);
+        $this->assertStringContainsString("{method === 'post' && (", $subtaskForm);
+        $this->assertStringContainsString('No active Subordinate users available.', $subtaskForm);
     }
 
     public function test_navigation_and_dashboard_show_my_assigned_subtasks_only_for_subordinate_and_task_workflow_links_for_coordinator(): void
@@ -544,6 +567,9 @@ class TaskSubtaskWorkflowTest extends TestCase
         return $user;
     }
 }
+
+
+
 
 
 
