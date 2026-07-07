@@ -118,15 +118,16 @@ class RoleBoundaryVisibilityTest extends TestCase
         $this->actingAs($subordinate)->get(route('subtasks.mine.show', $subtask))->assertOk();
     }
 
-    public function test_task_create_pages_do_not_expose_subordinate_assignment_or_fake_attachment_dropzone(): void
+    public function test_task_create_pages_expose_subordinate_shortcut_only_to_assigned_coordinator(): void
     {
         $admin = $this->makeAdmin('assignment-admin@example.com');
         $pm = $this->makePm('assignment-pm@example.com');
         $coordinator = $this->makeCoordinator('assignment-coordinator@example.com');
+        $subordinate = $this->makeSubordinate('shortcut-visible-subordinate@example.com');
         $project = Project::factory()->create();
         $this->assignCoordinator($project, $coordinator, $admin);
 
-        foreach ([$admin, $pm, $coordinator] as $user) {
+        foreach ([$admin, $pm] as $user) {
             $this->actingAs($user)->get(route('project.tasks.create', $project))
                 ->assertOk()
                 ->assertDontSee('Assign To')
@@ -134,8 +135,19 @@ class RoleBoundaryVisibilityTest extends TestCase
                 ->assertDontSee('Attachments dropzone is visual only for this phase')
                 ->assertInertia(fn (Assert $page) => $page
                     ->component('Tasks/Form')
-                    ->missing('assignableSubordinates'));
+                    ->where('canAssignSubordinateOnCreate', false)
+                    ->where('assignableSubordinates', []));
         }
+
+        $this->actingAs($coordinator)->get(route('project.tasks.create', $project))
+            ->assertOk()
+            ->assertDontSee('Assign To')
+            ->assertDontSee('Select subordinate')
+            ->assertDontSee('Attachments dropzone is visual only for this phase')
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Tasks/Form')
+                ->where('canAssignSubordinateOnCreate', true)
+                ->where('assignableSubordinates', fn ($users): bool => collect($users)->pluck('id')->contains($subordinate->id)));
 
         $this->actingAs($coordinator)->post(route('project.tasks.store', $project), $this->taskPayload(['assigned_to' => $this->makeSubordinate('ignored-assignee@example.com')->id]))->assertRedirect();
         $task = Task::query()->latest('id')->first();
@@ -301,4 +313,5 @@ class RoleBoundaryVisibilityTest extends TestCase
         return $user;
     }
 }
+
 

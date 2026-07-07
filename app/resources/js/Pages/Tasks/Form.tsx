@@ -1,19 +1,35 @@
 import { Card, PageHeader, buttonClass } from '@/Components/Dius/ui';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Project, Task } from '@/types';
+import { BaseUser, Project, Task } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 import { Paperclip } from 'lucide-react';
 import { useRef } from 'react';
 
-export default function Form({ project, task, pageTitle, submitLabel, method, action, canAttachOnCreate = false, allowedFileTypes, maxFileSizeMb = 10 }: { project: Project; task: Task; statuses: string[]; pageTitle: string; submitLabel: string; method: 'post' | 'patch'; action: string; canAttachOnCreate?: boolean; allowedFileTypes?: string; maxFileSizeMb?: number }) {
+type Props = {
+    project: Project;
+    task: Task;
+    statuses: string[];
+    pageTitle: string;
+    submitLabel: string;
+    method: 'post' | 'patch';
+    action: string;
+    canAttachOnCreate?: boolean;
+    allowedFileTypes?: string;
+    maxFileSizeMb?: number;
+    canAssignSubordinateOnCreate?: boolean;
+    assignableSubordinates?: BaseUser[];
+};
+
+export default function Form({ project, task, pageTitle, submitLabel, method, action, canAttachOnCreate = false, allowedFileTypes, maxFileSizeMb = 10, canAssignSubordinateOnCreate = false, assignableSubordinates = [] }: Props) {
     const inputRef = useRef<HTMLInputElement>(null);
-    const { data, setData, post, patch, processing, errors } = useForm<{ title: string; description: string; status: string; priority: string; deadline: string; file: File | null }>({
+    const { data, setData, post, patch, processing, errors } = useForm<{ title: string; description: string; status: string; priority: string; deadline: string; file: File | null; subordinate_id: string }>({
         title: task.title || '',
         description: task.description || '',
         status: task.status || 'pending',
         priority: task.priority || 'medium',
         deadline: task.deadline?.slice(0, 10) || '',
         file: null,
+        subordinate_id: '',
     });
 
     function submit(event: React.FormEvent) {
@@ -48,6 +64,16 @@ export default function Form({ project, task, pageTitle, submitLabel, method, ac
                             <input type="date" value={data.deadline} onChange={(event) => setData('deadline', event.target.value)} className="mt-1 w-full rounded-lg border-gray-300 shadow-sm" />
                         </div>
                     </div>
+                    {method === 'post' && canAssignSubordinateOnCreate && (
+                        <div>
+                            <label className="text-sm font-semibold text-gray-900">Assign Subordinate</label>
+                            <select value={data.subordinate_id} onChange={(event) => setData('subordinate_id', event.target.value)} className="mt-1 w-full rounded-lg border-gray-300 shadow-sm focus:border-gray-500 focus:ring-gray-500">
+                                <option value="">Assign later</option>
+                                {assignableSubordinates.map((subordinate) => <option key={subordinate.id} value={subordinate.id}>{subordinate.name}</option>)}
+                            </select>
+                            {errors.subordinate_id && <p className="mt-1 text-sm text-red-600">{errors.subordinate_id}</p>}
+                        </div>
+                    )}
                     {method === 'post' && canAttachOnCreate && (
                         <div className="rounded-lg border border-gray-200 p-3">
                             <input ref={inputRef} type="file" accept={allowedFileTypes} className="hidden" onChange={(event) => setData('file', event.target.files?.[0] || null)} />
@@ -71,4 +97,3 @@ export default function Form({ project, task, pageTitle, submitLabel, method, ac
         </AuthenticatedLayout>
     );
 }
-

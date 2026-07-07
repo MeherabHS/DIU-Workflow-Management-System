@@ -35,13 +35,14 @@ type Props = {
     canCreateMessage?: boolean;
     messageStoreUrl?: string | null;
     allowedMessageTypes?: any[]; defaultMessageType?: string;
+    canShowComparison?: boolean;
     comparisonResult?: ComparisonResult | null;
     isComparisonConfigured?: boolean;
     comparisonRunUrl?: string | null;
     comparisonClearUrl?: string | null;
 };
 
-export default function Show({ project, pageTitle = 'Project Details', canViewTasks = false, canCreateTask = false, canAssignCoordinator = false, canUpdateProject = false, canFinalizeProject = false, canSubmitForReview = false, submitForReviewUrl = null, alreadyFinalized = null, closeHref, messages = [], canCreateMessage = false, messageStoreUrl, allowedMessageTypes = [], defaultMessageType = 'message', files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 10, fileSectionLabel = 'Attachments', fileCategoryOptions = [], defaultFileCategory, fileUploadHelperText, comparisonResult = null, isComparisonConfigured = false, comparisonRunUrl = null, comparisonClearUrl = null }: Props) {
+export default function Show({ project, pageTitle = 'Project Details', canViewTasks = false, canCreateTask = false, canAssignCoordinator = false, canUpdateProject = false, canFinalizeProject = false, canSubmitForReview = false, submitForReviewUrl = null, alreadyFinalized = null, closeHref, messages = [], canCreateMessage = false, messageStoreUrl, allowedMessageTypes = [], defaultMessageType = 'message', files = [], canUploadFile = false, fileUploadUrl = null, allowedFileTypes, maxFileSizeMb = 10, fileSectionLabel = 'Attachments', fileCategoryOptions = [], defaultFileCategory, fileUploadHelperText, canShowComparison = false, comparisonResult = null, isComparisonConfigured = false, comparisonRunUrl = null, comparisonClearUrl = null }: Props) {
     const { post: finalizePost, processing: finalizing } = useForm({});
     const { post: submitPost, processing: submittingForReview } = useForm({});
 
@@ -79,12 +80,13 @@ export default function Show({ project, pageTitle = 'Project Details', canViewTa
                 </div>
                 <section className="mb-6"><div className="mb-3 flex items-center justify-between"><h2 className="text-base font-semibold text-gray-950">Assigned To</h2>{canAssignCoordinator && <Link href={route('projects.assign-coordinator.edit', project.id)} className="text-sm font-semibold text-gray-900">Assign Coordinator</Link>}</div><AssignmentChips users={users} /></section>
                 <FileList files={files} canUploadFile={canUploadFile} fileUploadUrl={fileUploadUrl} allowedFileTypes={allowedFileTypes} maxFileSizeMb={maxFileSizeMb} title={fileSectionLabel} fileCategoryOptions={fileCategoryOptions} defaultFileCategory={defaultFileCategory} fileUploadHelperText={fileUploadHelperText} />
-                <RequirementDeliverableComparison isConfigured={isComparisonConfigured} result={comparisonResult} runUrl={comparisonRunUrl || ''} clearUrl={comparisonClearUrl || ''} />
+                {canShowComparison && <RequirementDeliverableComparison isConfigured={isComparisonConfigured} result={comparisonResult} runUrl={comparisonRunUrl || ''} clearUrl={comparisonClearUrl || ''} />}
                 <MessageThread messages={messages} canCreateMessage={canCreateMessage} messageStoreUrl={messageStoreUrl} allowedMessageTypes={allowedMessageTypes} defaultMessageType={defaultMessageType} viewAllHref={route('projects.messages.index', project.id)} />
                 <section className="mt-6"><h2 className="mb-3 text-base font-semibold text-gray-950">Assignment History</h2><div className="divide-y divide-gray-100 rounded-lg border border-gray-200">{(project.assignments || []).map((assignment) => <div key={assignment.id} className="grid gap-2 p-3 text-sm md:grid-cols-4"><span className="font-semibold">{assignment.coordinator?.name || 'Unknown'}</span><span>Assigned by {assignment.assigner?.name || 'Unknown'}</span><span>{dateText(assignment.assigned_at)}</span><span>{assignment.revoked_at ? `Revoked ${dateText(assignment.revoked_at)}` : 'Active'}</span></div>)}{!project.assignments?.length && <p className="p-3 text-sm text-gray-500">No assignment history found.</p>}</div></section>
             </DetailModal>
         </AuthenticatedLayout>
     );
 }
+
 
 

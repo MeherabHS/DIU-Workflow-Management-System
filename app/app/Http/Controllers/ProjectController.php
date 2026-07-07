@@ -189,6 +189,7 @@ class ProjectController extends Controller
             'sections' => ['Project Summary', 'Assignment History', 'Attachments', 'Feedback / Follow-up'],
             ...$this->workflowFileProps($project, $user, 'Attachments'),
             ...$this->messageThreadProps($project, $user),
+            'canShowComparison' => $user->hasAnyRole(['Admin', 'PM/Manager']),
             ...$this->comparisonProps($project, $user),
         ]);
     }
@@ -553,5 +554,7 @@ class ProjectController extends Controller
         app(WorkflowNotificationService::class)->notifyFileUploaded($file);
     }
 }
+
+
 
 

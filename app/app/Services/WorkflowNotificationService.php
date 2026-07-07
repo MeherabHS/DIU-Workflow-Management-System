@@ -127,7 +127,7 @@ class WorkflowNotificationService
             'subtask_id' => $subtask->id,
             'type' => 'subordinate_assigned',
             'title' => 'Work Item assigned',
-            'body' => "You have been assigned to {$subtask->title} under {$projectTitle}.",
+            'body' => "You have been assigned work under {$projectTitle}: {$subtask->title}",
             'action_url' => $this->relativeRoute('subtasks.mine.show', $subtask),
         ]);
     }
@@ -366,6 +366,7 @@ class WorkflowNotificationService
         return $recipients->unique('id');
     }
 }
+
 
 
 

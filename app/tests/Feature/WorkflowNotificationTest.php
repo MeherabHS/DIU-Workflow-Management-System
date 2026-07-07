@@ -88,7 +88,7 @@ class WorkflowNotificationTest extends TestCase
             'type' => 'subordinate_assigned',
             'subtask_id' => $subtask->id,
             'title' => 'Work Item assigned',
-            'body' => "You have been assigned to {$subtask->title} under {$subtask->project->title}.",
+            'body' => "You have been assigned work under {$subtask->project->title}: {$subtask->title}",
             'action_url' => '/my-subtasks/'.$subtask->id,
         ]);
 
@@ -132,7 +132,7 @@ class WorkflowNotificationTest extends TestCase
             'type' => 'subordinate_assigned',
             'subtask_id' => $created->id,
             'title' => 'Work Item assigned',
-            'body' => "You have been assigned to {$created->title} under {$task->project->title}.",
+            'body' => "You have been assigned work under {$task->project->title}: {$created->title}",
             'action_url' => '/my-subtasks/'.$created->id,
         ]);
     }
@@ -916,6 +916,7 @@ class WorkflowNotificationTest extends TestCase
         return $user;
     }
 }
+
 
 
 

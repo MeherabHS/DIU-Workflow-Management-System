@@ -553,6 +553,30 @@ class RequirementDeliverableComparisonTest extends TestCase
             'summary' => 'The submitted progress note partially satisfies the requirement.',
         ]);
     }
+
+    public function test_coordinator_and_subordinate_cannot_run_comparison_endpoint(): void
+    {
+        $admin = $this->makeAdmin('admin-run-blocked-comparison@example.com');
+        $coordinator = $this->makeCoordinator('coord-run-blocked-comparison@example.com');
+        $subordinate = $this->makeSubordinate('sub-run-blocked-comparison@example.com');
+        $project = Project::factory()->create();
+        $this->assignCoordinator($project, $coordinator, $admin);
+        $task = Task::factory()->for($project)->create();
+        $subtask = Subtask::factory()->for($project)->for($task)->create();
+        $this->assignSubtask($subtask, $subordinate, $coordinator);
+
+        $this->actingAs($coordinator)
+            ->postJson(route('projects.comparison.run', $project))
+            ->assertForbidden();
+
+        $this->actingAs($coordinator)
+            ->postJson(route('tasks.comparison.run', $task))
+            ->assertForbidden();
+
+        $this->actingAs($subordinate)
+            ->postJson(route('subtasks.comparison.run', $subtask))
+            ->assertForbidden();
+    }
     // Helpers
 
     protected function makeAdmin(?string $email = null): User
@@ -668,6 +692,7 @@ class RequirementDeliverableComparisonTest extends TestCase
         return $content;
     }
 }
+
 
 
 

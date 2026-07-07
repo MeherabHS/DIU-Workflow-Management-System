@@ -52,7 +52,6 @@ class MySubtaskController extends Controller
             'closeHref' => route('my-work-items.index'),
             ...$this->workflowFileProps($subtask, $request->user(), 'Evidence / Attachments'),
             ...$this->messageThreadProps($subtask, $request->user()),
-            ...$this->comparisonProps($subtask, $request->user()),
         ]);
     }
 
@@ -73,6 +72,8 @@ class MySubtaskController extends Controller
         return redirect()->route('subtasks.mine.show', $subtask)->with('status', 'Progress updated successfully.');
     }
 }
+
+
 
 
 

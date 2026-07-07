@@ -8,6 +8,7 @@ use App\Models\Subtask;
 use App\Models\SubtaskAssignment;
 use App\Models\Task;
 use App\Models\User;
+use App\Models\WorkflowNotification;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -419,9 +420,9 @@ class TaskSubtaskWorkflowTest extends TestCase
         $taskShow = file_get_contents(resource_path('js/Pages/Tasks/Show.tsx'));
         $subtaskForm = file_get_contents(resource_path('js/Pages/Subtasks/Form.tsx'));
 
-        $this->assertStringNotContainsString("label: 'Assigned To'", $taskShow);
-        $this->assertStringNotContainsString('<AssignmentChips users={assigned}', $taskShow);
-        $this->assertStringContainsString('Subordinates are assigned at Work Item level.', $taskShow);
+        $this->assertStringContainsString('Assigned Subordinate', $taskShow);
+        $this->assertStringContainsString('canAssignSubordinateOnTask', $taskShow);
+        $this->assertStringContainsString('Assign Subordinate', $taskShow);
         $this->assertStringContainsString("{method === 'post' && (", $subtaskForm);
         $this->assertStringContainsString('No active Subordinate users available.', $subtaskForm);
     }
@@ -488,6 +489,170 @@ class TaskSubtaskWorkflowTest extends TestCase
                 ->where('canAssignSubordinate', true)
                 ->where('canRevokeSubordinate', true)
                 ->where('actions.0', 'Assign Subordinate'));
+    }
+
+    public function test_coordinator_create_task_form_includes_active_subordinate_dropdown_only(): void
+    {
+        $admin = $this->makeAdmin('admin-task-shortcut-form@example.com');
+        $coordinator = $this->makeCoordinator('coord-task-shortcut-form@example.com');
+        $subordinate = $this->makeSubordinate('active-task-shortcut-sub@example.com');
+        $inactiveSubordinate = $this->makeSubordinate('inactive-task-shortcut-sub@example.com');
+        $inactiveSubordinate->update(['is_active' => false]);
+        $pending = User::factory()->create(['email' => 'pending-task-shortcut@example.com', 'is_active' => true]);
+        $pending->syncRoles([]);
+        $project = Project::factory()->create();
+        $this->assignCoordinator($project, $coordinator, $admin);
+
+        $this->actingAs($coordinator)->get(route('project.tasks.create', $project))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Tasks/Form')
+                ->where('canAssignSubordinateOnCreate', true)
+                ->where('assignableSubordinates', fn ($users): bool => collect($users)->pluck('id')->contains($subordinate->id)
+                    && ! collect($users)->pluck('id')->contains($inactiveSubordinate->id)
+                    && ! collect($users)->pluck('id')->contains($pending->id)));
+    }
+
+    public function test_coordinator_create_task_with_subordinate_creates_default_work_item_assignment_and_notification(): void
+    {
+        $admin = $this->makeAdmin('admin-task-shortcut-create@example.com');
+        $coordinator = $this->makeCoordinator('coord-task-shortcut-create@example.com');
+        $subordinate = $this->makeSubordinate('sub-task-shortcut-create@example.com');
+        $project = Project::factory()->create(['title' => 'Shortcut Project']);
+        $this->assignCoordinator($project, $coordinator, $admin);
+
+        $this->actingAs($coordinator)->post(route('project.tasks.store', $project), $this->taskPayload([
+            'title' => 'Shortcut Task',
+            'description' => 'Shortcut description',
+            'subordinate_id' => $subordinate->id,
+        ]))->assertRedirect();
+
+        $task = Task::where('title', 'Shortcut Task')->firstOrFail();
+        $subtask = Subtask::where('task_id', $task->id)->firstOrFail();
+
+        $this->assertSame('Shortcut Task', $subtask->title);
+        $this->assertSame('Shortcut description', $subtask->description);
+        $this->assertDatabaseHas('subtask_assignments', [
+            'subtask_id' => $subtask->id,
+            'subordinate_id' => $subordinate->id,
+            'assigned_by' => $coordinator->id,
+            'revoked_at' => null,
+        ]);
+
+        $this->actingAs($subordinate)->get(route('subtasks.mine'))
+            ->assertOk()
+            ->assertSee('Shortcut Task');
+
+        $this->assertDatabaseHas('workflow_notifications', [
+            'user_id' => $subordinate->id,
+            'actor_id' => $coordinator->id,
+            'type' => 'subordinate_assigned',
+            'subtask_id' => $subtask->id,
+            'title' => 'Work Item assigned',
+            'body' => 'You have been assigned work under Shortcut Project: Shortcut Task',
+            'action_url' => '/my-subtasks/'.$subtask->id,
+        ]);
+        $this->assertDatabaseMissing('workflow_notifications', [
+            'user_id' => $coordinator->id,
+            'type' => 'subordinate_assigned',
+            'subtask_id' => $subtask->id,
+        ]);
+    }
+
+    public function test_coordinator_create_task_assign_later_does_not_create_work_item(): void
+    {
+        $admin = $this->makeAdmin('admin-task-assign-later@example.com');
+        $coordinator = $this->makeCoordinator('coord-task-assign-later@example.com');
+        $project = Project::factory()->create();
+        $this->assignCoordinator($project, $coordinator, $admin);
+
+        $this->actingAs($coordinator)->post(route('project.tasks.store', $project), $this->taskPayload([
+            'title' => 'Assign Later Task',
+            'subordinate_id' => null,
+        ]))->assertRedirect();
+
+        $task = Task::where('title', 'Assign Later Task')->firstOrFail();
+        $this->assertSame(0, Subtask::where('task_id', $task->id)->count());
+    }
+
+    public function test_task_detail_assign_subordinate_creates_default_work_item_when_needed(): void
+    {
+        $admin = $this->makeAdmin('admin-task-detail-assign@example.com');
+        $coordinator = $this->makeCoordinator('coord-task-detail-assign@example.com');
+        $subordinate = $this->makeSubordinate('sub-task-detail-assign@example.com');
+        $project = Project::factory()->create();
+        $this->assignCoordinator($project, $coordinator, $admin);
+        $task = Task::factory()->for($project)->create(['title' => 'Detail Assign Task']);
+
+        $this->actingAs($coordinator)->post(route('tasks.assign-subordinate.store', $task), [
+            'subordinate_id' => $subordinate->id,
+        ])->assertRedirect(route('tasks.show', $task));
+
+        $subtask = Subtask::where('task_id', $task->id)->firstOrFail();
+        $this->assertSame('Detail Assign Task', $subtask->title);
+        $this->assertDatabaseHas('subtask_assignments', [
+            'subtask_id' => $subtask->id,
+            'subordinate_id' => $subordinate->id,
+            'assigned_by' => $coordinator->id,
+            'revoked_at' => null,
+        ]);
+    }
+
+    public function test_pm_cannot_assign_subordinate_through_task_creation_shortcut(): void
+    {
+        $pm = $this->makePm('pm-task-shortcut-blocked@example.com');
+        $subordinate = $this->makeSubordinate('sub-pm-task-shortcut-blocked@example.com');
+        $project = Project::factory()->create();
+
+        $this->actingAs($pm)->post(route('project.tasks.store', $project), $this->taskPayload([
+            'title' => 'PM Shortcut Attempt',
+            'subordinate_id' => $subordinate->id,
+        ]))->assertForbidden();
+
+        $this->assertDatabaseMissing('tasks', ['title' => 'PM Shortcut Attempt']);
+        $this->assertSame(0, SubtaskAssignment::count());
+    }
+
+    public function test_lower_roles_do_not_receive_or_render_ai_comparison_or_generic_progress(): void
+    {
+        $admin = $this->makeAdmin('admin-ai-hidden@example.com');
+        $coordinator = $this->makeCoordinator('coord-ai-hidden@example.com');
+        $subordinate = $this->makeSubordinate('sub-ai-hidden@example.com');
+        $project = Project::factory()->create();
+        $this->assignCoordinator($project, $coordinator, $admin);
+        $task = Task::factory()->for($project)->create();
+        $subtask = Subtask::factory()->for($project)->for($task)->create();
+        $this->assignSubtask($subtask, $subordinate, $coordinator);
+
+        $this->actingAs($coordinator)->get(route('projects.show', $project))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('canShowComparison', false)
+                ->where('comparisonResult', null)
+                ->where('comparisonRunUrl', null));
+
+        $this->actingAs($coordinator)->get(route('tasks.show', $task))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('canShowComparison', false)
+                ->where('comparisonResult', null)
+                ->where('comparisonRunUrl', null));
+
+        $this->actingAs($subordinate)->get(route('subtasks.mine.show', $subtask))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->missing('comparisonResult')
+                ->missing('comparisonRunUrl'));
+
+        $taskShow = file_get_contents(resource_path('js/Pages/Tasks/Show.tsx'));
+        $mySubtaskShow = file_get_contents(resource_path('js/Pages/MySubtasks/Show.tsx'));
+        $subtaskShow = file_get_contents(resource_path('js/Pages/Subtasks/Show.tsx'));
+
+        $this->assertStringNotContainsString("expected={['Assignment'", $subtaskShow);
+        $this->assertStringNotContainsString("expected={['Review assignment'", $mySubtaskShow);
+        $this->assertStringContainsString('canShowComparison && <RequirementDeliverableComparison', $taskShow);
+        $this->assertStringNotContainsString('RequirementDeliverableComparison', $mySubtaskShow);
+        $this->assertStringNotContainsString('ProgressComparison', $mySubtaskShow);
     }
     protected function taskPayload(array $overrides = []): array
     {
@@ -567,6 +732,8 @@ class TaskSubtaskWorkflowTest extends TestCase
         return $user;
     }
 }
+
+
 
 
 

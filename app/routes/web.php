@@ -93,6 +93,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
     Route::get('/projects/{project}/tasks/create', [TaskController::class, 'create'])->name('project.tasks.create');
     Route::post('/projects/{project}/tasks', [TaskController::class, 'store'])->name('project.tasks.store');
     Route::get('/tasks/{task}', [TaskController::class, 'show'])->name('tasks.show');
+    Route::post('/tasks/{task}/assign-subordinate', [TaskController::class, 'assignSubordinate'])->name('tasks.assign-subordinate.store');
     Route::get('/tasks/{task}/edit', [TaskController::class, 'edit'])->name('tasks.edit');
     Route::patch('/tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
 
@@ -219,5 +220,7 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
 });
 
 require __DIR__.'/auth.php';
+
+
 
 

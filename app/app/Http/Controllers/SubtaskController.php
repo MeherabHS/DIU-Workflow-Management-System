@@ -119,6 +119,7 @@ class SubtaskController extends Controller
             'actions' => $actions,
             ...$this->workflowFileProps($subtask, $user, 'Evidence / Attachments'),
             ...$this->messageThreadProps($subtask, $user),
+            'canShowComparison' => $user->hasAnyRole(['Admin', 'PM/Manager']),
             ...$this->comparisonProps($subtask, $user),
         ]);
     }
@@ -172,5 +173,7 @@ class SubtaskController extends Controller
         return ['pending', 'in_progress', 'submitted', 'approved', 'revision_required', 'completed', 'cancelled'];
     }
 }
+
+
 
 
