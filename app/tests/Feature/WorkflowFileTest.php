@@ -227,29 +227,90 @@ class WorkflowFileTest extends TestCase
         $this->assertStringNotContainsString($file->path, $response->headers->get('content-disposition'));
     }
 
-    public function test_delete_file_is_authorized_for_admin_and_pm_only(): void
+    public function test_assigned_coordinator_can_delete_own_deliverable_follow_up_evidence_and_attachment_files(): void
     {
         $admin = $this->makeAdmin();
-        $pm = $this->makePm('pm-delete-file@example.com');
-        $coordinator = $this->makeCoordinator('coordinator-delete-file@example.com');
-        $subordinate = $this->makeSubordinate('subordinate-delete-file@example.com');
+        $coordinator = $this->makeCoordinator('coordinator-delete-own-files@example.com');
         $project = Project::factory()->create();
-        $subtask = Subtask::factory()->forTask()->create();
-        $this->assignSubtask($subtask, $subordinate, $admin);
+        $task = Task::factory()->for($project)->create();
+        $subtask = Subtask::factory()->for($project)->for($task)->create();
+        $this->assignCoordinator($project, $coordinator, $admin);
 
-        $coordinatorFile = $this->makeWorkflowFile($project, $coordinator, 'coordinator-owned.pdf');
-        $subordinateFile = $this->makeWorkflowFile($subtask, $subordinate, 'subordinate-owned.pdf');
+        foreach ([
+            [$project, 'coordinator-deliverable.pdf', 'deliverable'],
+            [$project, 'coordinator-follow-up.pdf', 'follow_up'],
+            [$task, 'coordinator-attachment.pdf', 'attachment'],
+            [$subtask, 'coordinator-evidence.pdf', 'evidence'],
+            [$project, 'coordinator-other.pdf', 'other'],
+        ] as [$context, $name, $category]) {
+            $file = $this->makeWorkflowFile($context, $coordinator, $name, $category);
 
-        $this->actingAs($coordinator)->delete(route('workflow-files.destroy', $coordinatorFile))->assertForbidden();
-        $this->actingAs($subordinate)->delete(route('workflow-files.destroy', $subordinateFile))->assertForbidden();
-
-        $this->actingAs($pm)->delete(route('workflow-files.destroy', $coordinatorFile))->assertRedirect();
-        $this->assertSoftDeleted('workflow_files', ['id' => $coordinatorFile->id]);
-
-        $this->actingAs($admin)->delete(route('workflow-files.destroy', $subordinateFile))->assertRedirect();
-        $this->assertSoftDeleted('workflow_files', ['id' => $subordinateFile->id]);
+            $this->actingAs($coordinator)->delete(route('workflow-files.destroy', $file))->assertRedirect();
+            $this->assertSoftDeleted('workflow_files', ['id' => $file->id]);
+            Storage::disk('local')->assertMissing($file->path);
+        }
     }
 
+    public function test_coordinator_cannot_delete_pm_requirement_or_another_users_file_or_unassigned_project_file(): void
+    {
+        $admin = $this->makeAdmin('admin-delete-boundary@example.com');
+        $pm = $this->makePm('pm-delete-boundary@example.com');
+        $coordinator = $this->makeCoordinator('coordinator-delete-boundary@example.com');
+        $otherCoordinator = $this->makeCoordinator('other-coordinator-delete-boundary@example.com');
+        $assignedProject = Project::factory()->create();
+        $unassignedProject = Project::factory()->create();
+        $this->assignCoordinator($assignedProject, $coordinator, $admin);
+
+        $requirement = $this->makeWorkflowFile($assignedProject, $pm, 'pm-requirement.pdf', 'requirement');
+        $otherUserFile = $this->makeWorkflowFile($assignedProject, $otherCoordinator, 'other-user-deliverable.pdf', 'deliverable');
+        $unassignedFile = $this->makeWorkflowFile($unassignedProject, $coordinator, 'unassigned-deliverable.pdf', 'deliverable');
+
+        $this->actingAs($coordinator)->delete(route('workflow-files.destroy', $requirement))->assertForbidden();
+        $this->actingAs($coordinator)->delete(route('workflow-files.destroy', $otherUserFile))->assertForbidden();
+        $this->actingAs($coordinator)->delete(route('workflow-files.destroy', $unassignedFile))->assertForbidden();
+
+        $this->assertNotSoftDeleted('workflow_files', ['id' => $requirement->id]);
+        $this->assertNotSoftDeleted('workflow_files', ['id' => $otherUserFile->id]);
+        $this->assertNotSoftDeleted('workflow_files', ['id' => $unassignedFile->id]);
+    }
+
+    public function test_coordinator_cannot_delete_own_file_when_project_is_locked_or_repository_finalized(): void
+    {
+        $admin = $this->makeAdmin('admin-delete-locked@example.com');
+        $coordinator = $this->makeCoordinator('coordinator-delete-locked@example.com');
+        $completedProject = Project::factory()->create(['status' => 'completed']);
+        $activeProject = Project::factory()->create();
+        $repositoryEntry = RepositoryEntry::factory()->for($activeProject)->create();
+        $this->assignCoordinator($completedProject, $coordinator, $admin);
+        $this->assignCoordinator($activeProject, $coordinator, $admin);
+
+        $lockedFile = $this->makeWorkflowFile($completedProject, $coordinator, 'locked-deliverable.pdf', 'deliverable');
+        $repositoryFile = $this->makeWorkflowFile($repositoryEntry, $coordinator, 'repository-attachment.pdf', 'attachment');
+
+        $this->actingAs($coordinator)->delete(route('workflow-files.destroy', $lockedFile))->assertForbidden();
+        $this->actingAs($coordinator)->delete(route('workflow-files.destroy', $repositoryFile))->assertForbidden();
+    }
+
+    public function test_admin_and_pm_delete_behavior_still_works_and_subordinate_cannot_delete_project_file(): void
+    {
+        $admin = $this->makeAdmin('admin-delete-file@example.com');
+        $pm = $this->makePm('pm-delete-file@example.com');
+        $subordinate = $this->makeSubordinate('subordinate-delete-file@example.com');
+        $project = Project::factory()->create();
+
+        $pmFile = $this->makeWorkflowFile($project, $pm, 'pm-owned.pdf', 'requirement');
+        $adminFile = $this->makeWorkflowFile($project, $admin, 'admin-owned.pdf', 'attachment');
+        $subordinateProjectFile = $this->makeWorkflowFile($project, $subordinate, 'sub-project-file.pdf', 'evidence');
+
+        $this->actingAs($subordinate)->delete(route('workflow-files.destroy', $subordinateProjectFile))->assertForbidden();
+        $this->assertNotSoftDeleted('workflow_files', ['id' => $subordinateProjectFile->id]);
+
+        $this->actingAs($pm)->delete(route('workflow-files.destroy', $adminFile))->assertRedirect();
+        $this->assertSoftDeleted('workflow_files', ['id' => $adminFile->id]);
+
+        $this->actingAs($admin)->delete(route('workflow-files.destroy', $pmFile))->assertRedirect();
+        $this->assertSoftDeleted('workflow_files', ['id' => $pmFile->id]);
+    }
     public function test_project_task_subtask_and_my_subtask_detail_pages_include_file_props(): void
     {
         $admin = $this->makeAdmin();
@@ -299,6 +360,30 @@ class WorkflowFileTest extends TestCase
             ->where('files.0.can_delete', true));
     }
 
+
+    public function test_project_file_payload_marks_coordinator_owned_files_deletable_only_when_allowed(): void
+    {
+        $admin = $this->makeAdmin('admin-file-payload-delete@example.com');
+        $pm = $this->makePm('pm-file-payload-delete@example.com');
+        $coordinator = $this->makeCoordinator('coord-file-payload-delete@example.com');
+        $project = Project::factory()->create();
+        $this->assignCoordinator($project, $coordinator, $admin);
+
+        $ownDeliverable = $this->makeWorkflowFile($project, $coordinator, 'aaa-own-deliverable.pdf', 'deliverable');
+        $pmRequirement = $this->makeWorkflowFile($project, $pm, 'zzz-pm-requirement.pdf', 'requirement');
+
+        $this->actingAs($coordinator)->get(route('projects.show', $project))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('files.1.id', $ownDeliverable->id)
+                ->where('files.1.can_delete', true)
+                ->where('files.1.canDelete', true)
+                ->where('files.1.delete_url', route('workflow-files.destroy', $ownDeliverable))
+                ->where('files.0.id', $pmRequirement->id)
+                ->where('files.0.can_delete', false)
+                ->where('files.0.canDelete', false)
+                ->where('files.0.delete_url', null));
+    }
     public function test_project_file_list_returns_latest_hundred_files(): void
     {
         $admin = $this->makeAdmin();
@@ -343,6 +428,7 @@ class WorkflowFileTest extends TestCase
         $this->assertStringContainsString('FileText', $fileCard);
         $this->assertStringContainsString('Download', $fileCard);
         $this->assertStringContainsString('file.original_name', $fileCard);
+        $this->assertStringContainsString('file.can_delete || file.canDelete', $fileCard);
     }
     public function test_pm_can_create_project_with_initial_attachment(): void
     {
@@ -757,6 +843,9 @@ class WorkflowFileTest extends TestCase
         return $user;
     }
 }
+
+
+
 
 
 

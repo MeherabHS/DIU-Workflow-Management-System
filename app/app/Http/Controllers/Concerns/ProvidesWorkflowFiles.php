@@ -123,6 +123,7 @@ trait ProvidesWorkflowFiles
             'uploaded_at' => $file->created_at?->toDateTimeString(),
             'download_url' => route('workflow-files.download', $file),
             'can_delete' => $user->can('delete', $file),
+            'canDelete' => $user->can('delete', $file),
             'delete_url' => $user->can('delete', $file) ? route('workflow-files.destroy', $file) : null,
         ])->all();
     }
@@ -189,6 +190,8 @@ trait ProvidesWorkflowFiles
         ];
     }
 }
+
+
 
 
 

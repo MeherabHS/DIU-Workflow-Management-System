@@ -11,6 +11,7 @@ export type WorkflowFile = {
     uploaded_at?: string | null;
     download_url: string;
     can_delete?: boolean;
+    canDelete?: boolean;
     delete_url?: string | null;
 };
 
@@ -54,7 +55,7 @@ export default function FileCard({ file }: { file: WorkflowFile }) {
                 <a href={file.download_url} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-700 hover:bg-gray-100" title="Download">
                     <Download className="h-4 w-4" />
                 </a>
-                {file.can_delete && file.delete_url && (
+                {(file.can_delete || file.canDelete) && file.delete_url && (
                     <button type="button" onClick={destroy} className="inline-flex h-8 w-8 items-center justify-center rounded-md text-red-700 hover:bg-red-50" title="Delete">
                         <Trash2 className="h-4 w-4" />
                     </button>
@@ -63,5 +64,6 @@ export default function FileCard({ file }: { file: WorkflowFile }) {
         </div>
     );
 }
+
 
 

@@ -58,11 +58,61 @@ class WorkflowFilePolicy
 
     public function delete(User $user, WorkflowFile $workflowFile): bool
     {
-        if (! $user->can('delete workflow file')) {
+        if ($user->hasAnyRole(['Admin', 'PM/Manager'])) {
+            return $user->can('delete workflow file');
+        }
+
+        return $this->canCoordinatorDeleteOwnWorkflowFile($user, $workflowFile);
+    }
+
+    protected function canCoordinatorDeleteOwnWorkflowFile(User $user, WorkflowFile $workflowFile): bool
+    {
+        if (! $user->hasRole('Coordinator')) {
             return false;
         }
 
-        return $user->hasAnyRole(['Admin', 'PM/Manager']);
+        if ((int) $workflowFile->uploaded_by !== (int) $user->id) {
+            return false;
+        }
+
+        if ($workflowFile->repository_entry_id !== null) {
+            return false;
+        }
+
+        if (! in_array($workflowFile->file_category, ['follow_up', 'deliverable', 'evidence', 'attachment', 'other'], true)) {
+            return false;
+        }
+
+        $project = $this->projectForWorkflowFile($workflowFile);
+
+        if (! $project || $this->isLockedProject($project)) {
+            return false;
+        }
+
+        return $this->isAssignedCoordinator($user, $project)
+            && $this->view($user, $workflowFile);
+    }
+
+    protected function projectForWorkflowFile(WorkflowFile $workflowFile): ?Project
+    {
+        if ($workflowFile->subtask) {
+            return $workflowFile->subtask->project;
+        }
+
+        if ($workflowFile->task) {
+            return $workflowFile->task->project;
+        }
+
+        if ($workflowFile->repositoryEntry) {
+            return $workflowFile->repositoryEntry->project;
+        }
+
+        return $workflowFile->project;
+    }
+
+    protected function isLockedProject(Project $project): bool
+    {
+        return in_array($project->status, ['completed', 'archived', 'cancelled'], true);
     }
 
     protected function viewProjectContext(User $user, Project $project): bool
@@ -150,5 +200,4 @@ class WorkflowFilePolicy
                 ->exists();
     }
 }
-
 
